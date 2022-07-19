@@ -3,9 +3,9 @@
 #include <sndfile.h>
 #include <math.h>
  
-static char *device = "plughw:0,0";         /* playback device */
+static char *device = "default";         /* playback device */
 static snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;    /* sample format */
-static unsigned int rate = 48000;           /* stream rate */
+static unsigned int rate = 44100;           /* stream rate */
 static unsigned int channels = 2;           /* count of channels */
 static unsigned int buffer_time = 500000;       /* ring buffer length in us */
 static unsigned int period_time = 250000;       /* period time in us */
@@ -16,7 +16,7 @@ static int period_event = 0;                /* produce poll event after each per
 static snd_pcm_sframes_t buffer_size;
 static snd_pcm_sframes_t period_size;
 
-char *infilename = "./audioFiles/california.wav";
+char *infilename = "./audioFiles/afraid.wav";
 SF_INFO sfinfo;
 SNDFILE *infile = NULL;
 
@@ -182,6 +182,7 @@ static int wait_for_poll(snd_pcm_t *handle, struct pollfd *ufds, unsigned int co
     unsigned short revents;
  
     while (1) {
+        /** A period is the number of frames in between each hardware interrupt. The poll() will return once a period */
         poll(ufds, count, -1);
         snd_pcm_poll_descriptors_revents(handle, ufds, count, &revents);
         if (revents & POLLERR)
@@ -239,6 +240,7 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
         if(!(readcount = sf_readf_short(infile, samples, period_size)>0)) {
             break;
         }
+        
         printf("Readcount: %i\n", readcount);
         printf("Periodsize: %ld\n", period_size);
 

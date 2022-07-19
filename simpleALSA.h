@@ -1,5 +1,33 @@
 #include <alsa/asoundlib.h>
 
+/** MACROS **/
+
+#if !defined(DEFAULT_SAMPLE_RATE)
+#define DEFAULT_SAMPLE_RATE = 48000;
+#endif // DEFAULT_SAMPL_RATE
+
+#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+#define DEFAULT_NUMBER_OF_CHANNELS = 2
+#endif // DEFAULT_NUMBER_OF_CHANNELS
+
+#if !defined(DEFAULT_AUDIO_FORMAT)
+#define DEFAULT_AUDIO_FORMAT = SND_PCM_FORMAT_S16_LE
+#endif // DEFAULT_AUDIO_FORMAT
+
+#if !defined(DEFAULT_BUFFER_TIME)
+#define DEFAULT_BUFFER_TIME = 500000 /** in µS - so half a second here */
+#endif // DEFAULT_BUFFER_TIME
+
+#if !defined(DEFAULT_PERIOD_TIME)
+#define DEFAULT_PERIOD_TIME = 250000 /** in µS - so quarter of a second here */
+#endif // DEFAULT_PERIOD_TIME
+
+
+
+
+
+
+
 /** ENUMS **/
 
 /**
@@ -89,6 +117,14 @@ sa_return_status sa_start_device(sa_device* device);
  * @return sa_return_status 
  */
 sa_return_status sa_pause_device(sa_device* device);
+
+/**
+ * @brief stops a simple ALSA device - same as pause but in addation, all buffer data is dropped
+ * 
+ * @param device - device to stop
+ * @return sa_return_status 
+ */
+sa_return_status sa_stop_device(sa_device* device);
 
 /**
  * @brief destroys the device - device pointer is set to NULL
