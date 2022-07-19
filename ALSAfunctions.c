@@ -179,13 +179,14 @@ sa_result set_swparams(sa_device *device) {
 }
 
 sa_result start_alsa_device(sa_device *device) {
-    sa_poll_management *poll_manager;
+    sa_poll_management *poll_manager = NULL;
     if(init_poll_management(device, poll_manager) != SA_SUCCESS)
     {
         printf("Could not allocate poll descriptors and pipe\n");
         return SA_ERROR;
     }
     write_and_poll_loop(device, poll_manager);
+    return SA_SUCCESS;
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager) {
@@ -238,8 +239,8 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     signed short *ptr;
     int err, cptr, init;
 
-    init = 1;
-    int readcount;
+    init          = 1;
+    int readcount = 0;
     while(1)
     {
         if(!init)
@@ -265,8 +266,8 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
             }
         }
         // CALL CALLBACK HERE to fill samples !!
-        void (*callbackFunction)(int framesToSend, void *audioBuffer,
-                                 sa_device *sa_device) = device->config->callbackFunction;
+        int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device) =
+          (int (*)(int, void *, sa_device *)) device->config->callbackFunction;
         callbackFunction(device->periodSize, device->samples, device);
         // if(!(readcount = sf_readf_short(infile, samples, period_size) > 0))
         //{ break; }
