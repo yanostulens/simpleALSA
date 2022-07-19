@@ -1,30 +1,34 @@
+#ifndef SIMPLEASLA_H
+#define SIMPLEALSA_H
+
+
 #include <alsa/asoundlib.h>
 
 /** MACROS **/
 
 #if !defined(DEFAULT_DEVICE)
     #define DEFAULT_DEVICE "default"
-#endif  // DEFAULT_DEVICE
+#endif
 
 #if !defined(DEFAULT_SAMPLE_RATE)
     #define DEFAULT_SAMPLE_RATE 48000
-#endif  // DEFAULT_SAMPL_RATE
+#endif
 
 #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
     #define DEFAULT_NUMBER_OF_CHANNELS 2
-#endif  // DEFAULT_NUMBER_OF_CHANNELS
+#endif
 
 #if !defined(DEFAULT_AUDIO_FORMAT)
     #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-#endif  // DEFAULT_AUDIO_FORMAT
+#endif
 
 #if !defined(DEFAULT_BUFFER_TIME)
     #define DEFAULT_BUFFER_TIME 500000 /** in µS - so half a second here */
-#endif                                 // DEFAULT_BUFFER_TIME
+#endif
 
 #if !defined(DEFAULT_PERIOD_TIME)
     #define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
-#endif                                 // DEFAULT_PERIOD_TIME
+#endif
 
 /** ENUMS **/
 
@@ -44,9 +48,9 @@ typedef enum
  */
 typedef enum
 {
-    UNINITIALIZED = 0,
-    INITIALIZED   = 1,
-    STARTED       = 2,
+    SA_DEVICE_UNINITIALIZED = 0,
+    SA_DEVICE_READY         = 1,
+    SA_DEVICE_STARTED       = 2,
 } sa_device_status;
 
 /** STRUCTS **/
@@ -141,3 +145,6 @@ sa_result sa_stop_device(sa_device *device);
  * @return sa_return_status
  */
 sa_result sa_destroy_device(sa_device *device);
+
+
+#endif // SIMPLEALSA_H

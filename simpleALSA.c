@@ -2,6 +2,7 @@
 
 sa_result sa_init_device_config(sa_device_config *config) {
     config = malloc(sizeof(sa_device_config));
+    if(!config) return SA_ERROR;
 
     config->sampleRate       = DEFAULT_SAMPLE_RATE;
     config->channels         = DEFAULT_NUMBER_OF_CHANNELS;
@@ -13,3 +14,14 @@ sa_result sa_init_device_config(sa_device_config *config) {
 
     return SA_SUCCESS;
 }
+
+sa_result sa_init_device(sa_device_config *config, sa_device *device) {
+    device = malloc(sizeof(sa_device));
+    if(!device) return SA_ERROR;
+
+    device->config = config;
+    device->status = SA_DEVICE_READY;
+
+    return SA_SUCCESS;
+}
+
