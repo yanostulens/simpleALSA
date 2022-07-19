@@ -11,12 +11,12 @@ sa_result init_alsa_device(sa_device *device) {
         exit(EXIT_FAILURE);
     }
 
-    if((err = set_hwparams(device->handle, device->hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
+    if((err = set_hwparams(device, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
     {
         printf("Setting of hwparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
-    if((err = set_swparams(device->handle, device->swparams)) < 0)
+    if((err = set_swparams(device)) < 0)
     {
         printf("Setting of swparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
@@ -29,6 +29,151 @@ sa_result init_alsa_device(sa_device *device) {
     {
         printf("No enough memory\n");
         exit(EXIT_FAILURE);
+    }
+    return SA_SUCCESS;
+}
+
+sa_result set_hwparams(sa_device *device, snd_pcm_access_t access) {
+    unsigned int rrate;
+    snd_pcm_uframes_t size;
+    int err, dir;
+
+    /* choose all parameters */
+    err = snd_pcm_hw_params_any(device->handle, device->hwparams);
+    if(err < 0)
+    {
+        printf("Broken configuration for playback: no configurations available: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* set hardware resampling */
+    err = snd_pcm_hw_params_set_rate_resample(device->handle, device->hwparams, 1);
+    if(err < 0)
+    {
+        printf("Resampling setup failed for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* set the interleaved read/write format */
+    err = snd_pcm_hw_params_set_access(device->handle, device->hwparams, access);
+    if(err < 0)
+    {
+        printf("Access type not available for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* set the sample format */
+    err = snd_pcm_hw_params_set_format(device->handle, device->hwparams, device->config->format);
+    if(err < 0)
+    {
+        printf("Sample format not available for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* set the count of channels */
+    err = snd_pcm_hw_params_set_channels(device->handle, device->hwparams, device->config->channels);
+    if(err < 0)
+    {
+        printf("Channels count (%u) not available for playbacks: %s\n", device->config->channels,
+               snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* set the stream rate */
+    rrate = device->config->sampleRate;
+    err   = snd_pcm_hw_params_set_rate_near(device->handle, device->hwparams, &rrate, 0);
+    if(err < 0)
+    {
+        printf("Rate %uHz not available for playback: %s\n", device->config->sampleRate, snd_strerror(err));
+        return SA_ERROR;
+    }
+    if(rrate != device->config->sampleRate)
+    {
+        printf("Rate doesn't match (requested %uHz, get %iHz)\n", device->config->sampleRate, err);
+        // return -EINVAL;
+        return SA_ERROR;
+    }
+    /* set the buffer time */
+    err = snd_pcm_hw_params_set_buffer_time_near(device->handle, device->hwparams,
+                                                 &(device->config->bufferTime), &dir);
+    if(err < 0)
+    {
+        printf("Unable to set buffer time %u for playback: %s\n", device->config->bufferTime,
+               snd_strerror(err));
+        return SA_ERROR;
+    }
+    err = snd_pcm_hw_params_get_buffer_size(device->hwparams, &size);
+    if(err < 0)
+    {
+        printf("Unable to get buffer size for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    device->bufferSize = size;
+    /* set the period time */
+    err                = snd_pcm_hw_params_set_period_time_near(device->handle, device->hwparams,
+                                                 &(device->config->periodTime), &dir);
+    if(err < 0)
+    {
+        printf("Unable to set period time %u for playback: %s\n", device->config->periodTime,
+               snd_strerror(err));
+        return SA_ERROR;
+    }
+    err = snd_pcm_hw_params_get_period_size(device->hwparams, &size, &dir);
+    if(err < 0)
+    {
+        printf("Unable to get period size for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    device->periodSize = size;
+    /* write the parameters to device */
+    err                = snd_pcm_hw_params(device->handle, device->hwparams);
+    if(err < 0)
+    {
+        printf("Unable to set hw params for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    return SA_SUCCESS;
+}
+
+sa_result set_swparams(sa_device *device) {
+    int err;
+
+    /* get the current swparams */
+    err = snd_pcm_sw_params_current(device->handle, device->swparams);
+    if(err < 0)
+    {
+        printf("Unable to determine current swparams for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* start the transfer when the buffer is almost full: */
+    /* (buffer_size / avail_min) * avail_min */
+    err = snd_pcm_sw_params_set_start_threshold(
+      device->handle, device->swparams, (device->bufferSize / device->periodSize) * device->periodSize);
+    if(err < 0)
+    {
+        printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* allow the transfer when at least period_size samples can be processed */
+    /* or disable this mechanism when period event is enabled (aka interrupt like style processing) */
+    err = snd_pcm_sw_params_set_avail_min(device->handle, device->swparams,
+                                          0 ? device->bufferSize : device->periodSize);
+    if(err < 0)
+    {
+        printf("Unable to set avail min for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
+    }
+    /* enable period events when requested */
+    if(0)
+    {
+        err = snd_pcm_sw_params_set_period_event(device->handle, device->swparams, 1);
+        if(err < 0)
+        {
+            printf("Unable to set period event: %s\n", snd_strerror(err));
+            return SA_ERROR;
+        }
+    }
+    /* write the parameters to the playback device */
+    err = snd_pcm_sw_params(device->handle, device->swparams);
+    if(err < 0)
+    {
+        printf("Unable to set sw params for playback: %s\n", snd_strerror(err));
+        return SA_ERROR;
     }
     return SA_SUCCESS;
 }

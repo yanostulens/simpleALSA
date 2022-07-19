@@ -30,21 +30,18 @@ sa_result init_alsa_device(sa_device *device);
 /**
  * @brief Sets the ALSA hardware parameters
  *
- * @param handle
- * @param params
+ * @param device
  * @param access
  * @return sa_result
  */
-sa_result set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_access_t access);
-
+sa_result set_hwparams(sa_device *device, snd_pcm_access_t access);
 /**
  * @brief Sets the ALSA software parameters
  *
- * @param handle
- * @param swparams
+ * @param device
  * @return sa_result
  */
-sa_result set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams);
+sa_result set_swparams(sa_device *device);
 
 /**
  * @brief Starts the ALSA write and wait loop
