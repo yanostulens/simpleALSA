@@ -9,19 +9,17 @@ static unsigned int rate        = 44100;                 /* stream rate */
 static unsigned int channels    = 2;                     /* count of channels */
 static unsigned int buffer_time = 500000;                /* ring buffer length in us */
 static unsigned int period_time = 250000;                /* period time in us */
-static double freq              = 300;                   /* sinusoidal wave frequency in Hz */
 static int resample             = 1;                     /* enable alsa-lib resampling */
 static int period_event         = 0;                     /* produce poll event after each period */
 
 static snd_pcm_sframes_t buffer_size;
 static snd_pcm_sframes_t period_size;
 
-char *infilename = "./audioFiles/afraid.wav";
+char *infilename = "./audioFiles/california.wav";
 SF_INFO sfinfo;
 SNDFILE *infile = NULL;
 
-static void initSndFile()
-{
+static void initSndFile() {
     infile = sf_open(infilename, SFM_READ, &sfinfo);
     if(!infile)
     {
@@ -34,8 +32,7 @@ static void initSndFile()
     fprintf(stderr, "Format: %d\n", sfinfo.format);
 }
 
-static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_access_t access)
-{
+static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_access_t access) {
     unsigned int rrate;
     snd_pcm_uframes_t size;
     int err, dir;
@@ -126,8 +123,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
     return 0;
 }
 
-static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
-{
+static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams) {
     int err;
 
     /* get the current swparams */
@@ -173,8 +169,7 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
     return 0;
 }
 
-static int xrun_recovery(snd_pcm_t *handle, int err)
-{
+static int xrun_recovery(snd_pcm_t *handle, int err) {
     if(err == -EPIPE)
     { /* under-run */
         err = snd_pcm_prepare(handle);
@@ -200,15 +195,26 @@ static int xrun_recovery(snd_pcm_t *handle, int err)
  *   Transfer method - write and wait for room in buffer using poll
  */
 
-static int wait_for_poll(snd_pcm_t *handle, struct pollfd *ufds, unsigned int count)
-{
+static int wait_for_poll(snd_pcm_t *handle, struct pollfd *ufds, unsigned int count) {
     unsigned short revents;
 
     while(1)
     {
         /** A period is the number of frames in between each hardware interrupt. The poll() will return once a period */
         poll(ufds, count, -1);
-        snd_pcm_poll_descriptors_revents(handle, ufds, count, &revents);
+
+        if(ufds[0].revents & POLLIN)
+        {
+            int status;
+            if((read(ufds[0].fd, &status, 1) == 1) && (status == 1))
+            {
+                // end has signaled
+                printf("Polling has been ended prematurely by pipe\n");
+                return -1;
+            }
+        }
+
+        snd_pcm_poll_descriptors_revents(handle, ufds + 1, count - 1, &revents);
         if(revents & POLLERR)
             return -EIO;
         if(revents & POLLOUT)
@@ -216,15 +222,29 @@ static int wait_for_poll(snd_pcm_t *handle, struct pollfd *ufds, unsigned int co
     }
 }
 
-static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
-{
+static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples) {
     struct pollfd *ufds;
     signed short *ptr;
     int err, count, cptr, init;
+    int pipe_fds[2];  // TODO store me somewhere (later)
 
-    count = snd_pcm_poll_descriptors_count(handle);
-    if(count <= 0)
+    if(pipe(pipe_fds))
     {
+        printf("Cannot create poll_pipe\n");
+        return -1;
+    }
+
+    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
+    {
+        printf("Failed to make pipe non-blocking\n");
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return 0;
+    }
+
+    count = 1 + snd_pcm_poll_descriptors_count(handle);
+    if(count <= 1)
+    {  // there must be at least one alsa descriptor
         printf("Invalid poll descriptors count\n");
         return count;
     }
@@ -235,8 +255,12 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
         printf("No enough memory\n");
         return -ENOMEM;
     }
-    if((err = snd_pcm_poll_descriptors(handle, ufds, count)) < 0)
-    {
+    // store read end of pipe //TODO make pipe to signal end
+    ufds[0].fd     = pipe_fds[0];
+    ufds[0].events = POLLIN;
+
+    if((err = snd_pcm_poll_descriptors(handle, ufds + 1, count - 1)) < 0)
+    {  // dont give ALSA the first poll descriptor
         printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
         return err;
     }
@@ -270,9 +294,7 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
 
         // generate_sine(areas, 0, period_size, &phase);
         if(!(readcount = sf_readf_short(infile, samples, period_size) > 0))
-        {
-            break;
-        }
+        { break; }
 
         printf("Readcount: %i\n", readcount);
         printf("Periodsize: %ld\n", period_size);
@@ -321,26 +343,14 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
             }
         }
     }
+    return -1;
 }
 
-struct transfer_method
-{
-    const char *name;
-    snd_pcm_access_t access;
-    int (*transfer_loop)(snd_pcm_t *handle, signed short *samples);
-};
-
-static struct transfer_method transfer_methods[] = {{"write_and_poll", SND_PCM_ACCESS_RW_INTERLEAVED,
-                                                     write_and_poll_loop},
-                                                    {NULL, SND_PCM_ACCESS_RW_INTERLEAVED, NULL}};
-
-int startAlsa()
-{
+int startAlsa() {
     snd_pcm_t *handle;
     int err;
     snd_pcm_hw_params_t *hwparams;
     snd_pcm_sw_params_t *swparams;
-    int method = 0;
     signed short *samples;
     // snd_pcm_channel_area_t *areas;
 
@@ -349,8 +359,6 @@ int startAlsa()
 
     printf("Playback device is %s\n", device);
     printf("Stream parameters are %uHz, %s, %u channels\n", rate, snd_pcm_format_name(format), channels);
-    printf("Sine wave rate is %.4fHz\n", freq);
-    printf("Using transfer method: %s\n", transfer_methods[method].name);
 
     if((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
     {
@@ -358,7 +366,7 @@ int startAlsa()
         return 0;
     }
 
-    if((err = set_hwparams(handle, hwparams, transfer_methods[method].access)) < 0)
+    if((err = set_hwparams(handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
     {
         printf("Setting of hwparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
@@ -388,7 +396,7 @@ int startAlsa()
     }*/
 
     // Call to the transfermethod
-    err = transfer_methods[method].transfer_loop(handle, samples);
+    err = write_and_poll_loop(handle, samples);
     if(err < 0)
         printf("Transfer failed: %s\n", snd_strerror(err));
 
@@ -398,8 +406,7 @@ int startAlsa()
     return 0;
 }
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]) {
     printf("Hello world\n");
     initSndFile();
     startAlsa();
