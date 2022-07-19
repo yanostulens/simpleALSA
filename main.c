@@ -189,7 +189,7 @@ static int wait_for_poll(snd_pcm_t *handle, struct pollfd *ufds, unsigned int co
         if (revents & POLLOUT)
             return 0;
     }
-}
+    return 0;}
 
 
 static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
@@ -204,7 +204,7 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
         return count;
     }
  
-    ufds = malloc(sizeof(struct pollfd) * count);
+    ufds = malloc(sizeof(struct pollfd) * count + 1); // one extra for connecting the cancellation pipe
     if (ufds == NULL) {
         printf("No enough memory\n");
         return -ENOMEM;
@@ -279,6 +279,8 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
             }
         }
     }
+
+    return 0;
 }
 
 

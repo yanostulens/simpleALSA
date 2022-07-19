@@ -9,7 +9,7 @@
 enum sa_result {
     SA_SUCCESS = 0,
     SA_ERROR = 1
-}
+};
 
 /**
  * @brief enum used to indicate the status of a device
@@ -19,10 +19,7 @@ enum sa_device_status {
     UNINITIALIZED = 0,
     INITIALIZED = 1,
     STARTED = 2,
-}
-
-
-
+};
 
 
 /** STRUCTS **/
@@ -53,8 +50,6 @@ struct sa_device
     sa_device_config* config;
     sa_device_status status;
 };
-
-
 
 
 /** FUNCTIONS DEFINITIONS **/
