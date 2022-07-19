@@ -34,7 +34,181 @@ sa_result init_alsa_device(sa_device *device) {
 }
 
 sa_result start_alsa_device(sa_device *device) {
-    // TODOO DAAN
+    sa_poll_management *poll_manager;
+    if(init_poll_management(device, poll_manager) < 0)
+    {
+        printf("Could not allocate poll descriptors and pipe\n");
+        return SA_ERROR;
+    }
+
+    signed short *ptr;
+    int err, cptr, init;
+}
+
+sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager) {
+    poll_manager = (sa_poll_management *) malloc(sizeof(sa_poll_management));
+    int pipe_fds[2];  // store me somewhere (later)
+    int err;
+    if(pipe(pipe_fds))
+    {
+        printf("Cannot create poll_pipe\n");
+        return -1;
+    }
+
+    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
+    {
+        printf("Failed to make pipe non-blocking\n");
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return 0;
+    }
+
+    poll_manager->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
+    // there must be at least one alsa descriptor
+    if(poll_manager->count <= 1)
+    {
+        printf("Invalid poll descriptors count\n");
+        return poll_manager->count;
+    }
+
+    poll_manager->ufds = malloc(sizeof(struct pollfd) * (poll_manager->count));
+    if(poll_manager->ufds == NULL)
+    {
+        printf("No enough memory\n");
+        return -ENOMEM;
+    }
+    // store read end of pipe
+    poll_manager->ufds[0].fd     = pipe_fds[0];
+    poll_manager->ufds[0].events = POLLIN;
+    // store the write end
+    device->pipe_write_end       = pipe_fds[1];
+    // dont give ALSA the first poll descriptor
+    if((err = snd_pcm_poll_descriptors(device->handle, poll_manager->ufds + 1, poll_manager->count - 1)) < 0)
+    {
+        printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
+        return err;
+    }
+    return SA_SUCCESS;
+}
+
+int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
+    signed short *ptr;
+    int err, cptr, init;
+
+    init = 1;
+    int readcount;
+    while(1)
+    {
+        if(!init)
+        {
+            err = wait_for_poll(device->handle, poll_manager);
+            if(err < 0)
+            {
+                if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
+                   snd_pcm_state(device->handle) == SND_PCM_STATE_SUSPENDED)
+                {
+                    err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
+                    if(xrun_recovery(device->handle, err) < 0)
+                    {
+                        printf("Write error: %s\n", snd_strerror(err));
+                        exit(EXIT_FAILURE);
+                    }
+                    init = 1;
+                } else
+                {
+                    printf("Wait for poll failed\n");
+                    return err;
+                }
+            }
+        }
+        // CALL CALLBACK HERE to fill samples !!
+
+        void (*callbackFunction)(int framesToSend, void *audioBuffer,
+                                 sa_device *sa_device) = device->config->callbackFunction;
+        callbackFunction(device->periodSize, device->samples, device);
+        // if(!(readcount = sf_readf_short(infile, samples, period_size) > 0))
+        //{ break; }
+
+        printf("Readcount: %i\n", readcount);
+        printf("Periodsize: %ld\n", device->periodSize);
+
+        ptr  = device->samples;
+        cptr = device->periodSize;
+        while(cptr > 0)
+        {
+            err = snd_pcm_writei(device->handle, ptr, cptr);
+            if(err < 0)
+            {
+                if(xrun_recovery(device->handle, err) < 0)
+                {
+                    printf("Write error: %s\n", snd_strerror(err));
+                    exit(EXIT_FAILURE);
+                }
+                init = 1;
+                break; /* skip one period */
+            }
+            if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
+                init = 0;
+            ptr += err * device->config->channels;
+            cptr -= err;
+            if(cptr == 0)
+                break;
+            /* it is possible, that the initial buffer cannot store */
+            /* all data from the last period, so wait awhile */
+            err = wait_for_poll(device->handle, poll_manager);
+            if(err < 0)
+            {
+                if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
+                   snd_pcm_state(device->handle) == SND_PCM_STATE_SUSPENDED)
+                {
+                    err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
+                    if(xrun_recovery(device->handle, err) < 0)
+                    {
+                        printf("Write error: %s\n", snd_strerror(err));
+                        exit(EXIT_FAILURE);
+                    }
+                    init = 1;
+                } else
+                {
+                    printf("Wait for poll failed\n");
+                    return err;
+                }
+            }
+        }
+    }
+    return 1;
+}
+
+/*
+ *   Transfer method - write and wait for room in buffer using poll
+ */
+
+int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
+    unsigned short revents;
+
+    while(1)
+    {
+        /** A period is the number of frames in between each hardware interrupt. The poll() will return once a period */
+        poll(poll_manager->ufds, poll_manager->count, -1);
+
+        if(poll_manager->ufds[0].revents & POLLIN)
+        {
+            int status;
+            if((read(poll_manager->ufds[0].fd, &status, 1) == 1) && (status == 1))
+            {
+                // end has signaled
+                printf("Polling has been ended prematurely by pipe\n");
+                return -1;
+            }
+        }
+
+        snd_pcm_poll_descriptors_revents(handle, poll_manager->ufds + 1, poll_manager->count - 1, &revents);
+        if(revents & POLLERR)
+            return -EIO;
+        if(revents & POLLOUT)
+            return 0;
+    }
+    return -1;
 }
 
 sa_result pause_alsa_device(sa_device *device) {

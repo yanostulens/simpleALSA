@@ -5,6 +5,21 @@
 
 #include "simpleALSA.h"
 
+/** STRUCTS */
+
+/**
+ * @brief holds everything related to polling an playback
+ */
+typedef struct
+{
+    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
+    struct pollfd *ufds;
+    /** The amount of file descriptors to poll */
+    int count;
+} sa_poll_management;
+
+/** FUNCTIONS */
+
 /**
  * @brief Initialized an ALSA device
  *
@@ -62,5 +77,32 @@ sa_result stop_alsa_device(sa_device *device);
  * @return sa_result
  */
 sa_result drain_alsa_device(sa_device *device);
+
+/**
+ * @brief Initializes the polling filedescriptors for alsa and a pipe for canceling playback
+ *
+ * @param device
+ * @param poll_manager, nullpointer to initialize
+ * @return sa_result
+ */
+sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager);
+
+/**
+ * @brief Plays audio by repeatedly calling the callback function for framas
+ *
+ * @param device
+ * @param poll_manager
+ * @return int
+ */
+int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager);
+
+/**
+ * @brief Waits on poll and checks pipe
+ *
+ * @param handle
+ * @param poll_manager
+ * @return int
+ */
+int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager);
 
 #endif  // ALSAFUNCTIONS_H
