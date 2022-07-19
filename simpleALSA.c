@@ -1,7 +1,6 @@
 #include "simpleALSA.h"
 
-sa_result sa_init_device_config(sa_device_config *config)
-{
+sa_result sa_init_device_config(sa_device_config *config) {
     config = malloc(sizeof(sa_device_config));
 
     config->sampleRate       = DEFAULT_SAMPLE_RATE;
