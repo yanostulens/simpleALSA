@@ -115,6 +115,10 @@ typedef struct
 
     /** TODO */
     snd_pcm_sframes_t periodSize;
+
+    /** Refers to the pipe which can cancel poll when playback is canceled*/
+    int pipe_write_end;
+
 } sa_device;
 
 /** FUNCTIONS DEFINITIONS **/
