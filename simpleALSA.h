@@ -1,34 +1,33 @@
 #ifndef SIMPLEASLA_H
-#define SIMPLEALSA_H
+    #define SIMPLEALSA_H
 
-
-#include <alsa/asoundlib.h>
+    #include <alsa/asoundlib.h>
 
 /** MACROS **/
 
-#if !defined(DEFAULT_DEVICE)
-    #define DEFAULT_DEVICE "default"
-#endif
+    #if !defined(DEFAULT_DEVICE)
+        #define DEFAULT_DEVICE "default"
+    #endif
 
-#if !defined(DEFAULT_SAMPLE_RATE)
-    #define DEFAULT_SAMPLE_RATE 48000
-#endif
+    #if !defined(DEFAULT_SAMPLE_RATE)
+        #define DEFAULT_SAMPLE_RATE 48000
+    #endif
 
-#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-    #define DEFAULT_NUMBER_OF_CHANNELS 2
-#endif
+    #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+        #define DEFAULT_NUMBER_OF_CHANNELS 2
+    #endif
 
-#if !defined(DEFAULT_AUDIO_FORMAT)
-    #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-#endif
+    #if !defined(DEFAULT_AUDIO_FORMAT)
+        #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
+    #endif
 
-#if !defined(DEFAULT_BUFFER_TIME)
-    #define DEFAULT_BUFFER_TIME 500000 /** in µS - so half a second here */
-#endif
+    #if !defined(DEFAULT_BUFFER_TIME)
+        #define DEFAULT_BUFFER_TIME 500000 /** in µS - so half a second here */
+    #endif
 
-#if !defined(DEFAULT_PERIOD_TIME)
-    #define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
-#endif
+    #if !defined(DEFAULT_PERIOD_TIME)
+        #define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
+    #endif
 
 /** ENUMS **/
 
@@ -93,8 +92,29 @@ typedef struct
  */
 typedef struct
 {
+    /** Pointer to the configuration settings of the device*/
     sa_device_config *config;
+
+    /** Enum indicating the status of the device */
     sa_device_status status;
+
+    /** Pointer to the ALSA PCM handle struct */
+    snd_pcm_t *handle;
+
+    /** Pointer to the ALSA hardware parameters */
+    snd_pcm_hw_params_t *hwparams;
+
+    /** Pointer to the ALSA hardware parameters */
+    snd_pcm_sw_params_t *swparams;
+
+    /** Pointer to the place is memory where audio samples are written right before being send to the ALSA buffer */
+    signed short *samples;
+
+    /** TODO */
+    snd_pcm_sframes_t bufferSize;
+
+    /** TODO */
+    snd_pcm_sframes_t periodSize;
 } sa_device;
 
 /** FUNCTIONS DEFINITIONS **/
@@ -146,5 +166,4 @@ sa_result sa_stop_device(sa_device *device);
  */
 sa_result sa_destroy_device(sa_device *device);
 
-
-#endif // SIMPLEALSA_H
+#endif  // SIMPLEALSA_H
