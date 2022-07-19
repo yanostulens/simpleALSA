@@ -20,7 +20,7 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE *infile) {
 }
 
 int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device) {
-    int readcount;
+    int readcount   = 0;
     SNDFILE *infile = (SNDFILE *) sa_device->myCustomData;
     readcount       = sf_readf_short(infile, sa_device->samples, sa_device->periodSize);
     return readcount;
@@ -29,9 +29,9 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device)
 int main(int argc, char const *argv[]) {
     char *infilename = "./audioFiles/california.wav";
     SF_INFO sfinfo;
-    SNDFILE *infile = NULL;
-    sa_device_config *config;
-    sa_device *device;
+    SNDFILE *infile          = NULL;
+    sa_device_config *config = NULL;
+    sa_device *device        = NULL;
     sa_init_device_config(config);
     config->callbackFunction = callback_function;
     sa_init_device(config, device);
