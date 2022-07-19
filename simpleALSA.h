@@ -1,6 +1,6 @@
 #ifndef SIMPLEASLA_H_
-
     #define SIMPLEALSA_H_
+    
     #include <alsa/asoundlib.h>
 
     #include "config.h"
