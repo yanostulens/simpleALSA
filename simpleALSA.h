@@ -1,5 +1,5 @@
 #ifndef SIMPLEASLA_H
-    #define SIMPLEALSA_H
+#define SIMPLEALSA_H
 
     #include <alsa/asoundlib.h>
 
