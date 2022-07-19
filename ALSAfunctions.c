@@ -1,6 +1,5 @@
 #include "ALSAfunctions.h"
 
-
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));
@@ -237,6 +236,33 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
             }
         }
         return SA_SUCCESS;
+    }
+    return SA_ERROR;
+}
+
+sa_result pause_alsa_device(sa_device *device) {
+    // TODOO DAAN: stop our callback loop here
+
+    if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
+    {
+        // TODO YANO PAUSE THE DEVICE HERE IN SOME WAY
+    }
+    return SA_ERROR;
+}
+
+sa_result stop_alsa_device(sa_device *device) {
+    // TODOO DAAN: stop our callback loop here
+    return SA_ERROR;
+}
+
+sa_result drain_alsa_device(sa_device *device) {
+    if(device->handle)
+    {
+        if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
+        {
+            snd_pcm_drain(device->handle);
+            return SA_SUCCESS;
+        }
     }
     return SA_ERROR;
 }
