@@ -7,4 +7,4 @@ int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_access_
 
 int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams);
 
-#endif // ALSAFUNCTIONS_H
+#endif  // ALSAFUNCTIONS_H

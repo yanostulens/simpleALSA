@@ -19,6 +19,8 @@ char *infilename = "./audioFiles/california.wav";
 SF_INFO sfinfo;
 SNDFILE *infile = NULL;
 
+pthread_t playback_thread;
+
 static void initSndFile() {
     infile = sf_open(infilename, SFM_READ, &sfinfo);
     if(!infile)
@@ -397,6 +399,10 @@ int startAlsa() {
 
     // Call to the transfermethod
     err = write_and_poll_loop(handle, samples);
+
+    //result_code = pthread_create(&playback_thread, NULL, write_and_poll_loop, &thread_args[i]);
+
+
     if(err < 0)
         printf("Transfer failed: %s\n", snd_strerror(err));
 
