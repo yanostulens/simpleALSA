@@ -176,19 +176,31 @@ static int xrun_recovery(snd_pcm_t *handle, int err)
 /*
  *   Transfer method - write and wait for room in buffer using poll
  */
- 
 static int wait_for_poll(snd_pcm_t *handle, struct pollfd *ufds, unsigned int count)
 {
     unsigned short revents;
  
     while (1) {
         poll(ufds, count, -1);
-        snd_pcm_poll_descriptors_revents(handle, ufds, count, &revents);
+
+
+        if (ufds[0].revents & POLLIN){
+            int status;
+            if ((read (ufds[0].fd, & status, 1) == 1) && (status == 1)){
+                //end has signaled 
+                printf("Polling has been ended prematurely by pipe\n");
+                return -1;
+            }
+        }
+
+        snd_pcm_poll_descriptors_revents(handle, ufds+1, count-1, &revents);
         if (revents & POLLERR)
             return -EIO;
         if (revents & POLLOUT)
             return 0;
     }
+
+    return 0;
 }
 
 
@@ -197,9 +209,24 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
     struct pollfd *ufds;
     signed short *ptr;
     int err, count, cptr, init;
+    int pipe_fds[2]; //TODO store me somewhere (later)
+
+    if (pipe (pipe_fds))
+    {
+        printf("Cannot create poll_pipe\n");
+        return -1;
+    }
+
+    if (fcntl (pipe_fds[0], F_SETFL, O_NONBLOCK))
+    {
+        printf("Failed to make pipe non-blocking\n");
+        close (pipe_fds[0]);
+        close (pipe_fds[1]);
+        return 0;
+    }
  
-    count = snd_pcm_poll_descriptors_count (handle);
-    if (count <= 0) {
+    count = 1 + snd_pcm_poll_descriptors_count (handle);
+    if (count <= 1) { //there must be at least one alsa descriptor
         printf("Invalid poll descriptors count\n");
         return count;
     }
@@ -209,7 +236,11 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
         printf("No enough memory\n");
         return -ENOMEM;
     }
-    if ((err = snd_pcm_poll_descriptors(handle, ufds, count)) < 0) {
+
+    ufds[0].fd = pipe_fds[0]; //store read end of pipe //TODO make pipe to signal end
+    ufds[0].events = POLLIN;
+
+    if ((err = snd_pcm_poll_descriptors(handle, ufds + 1, count - 1)) < 0) { //dont give ALSA the first poll descriptor
         printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
         return err;
     }
