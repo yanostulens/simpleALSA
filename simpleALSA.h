@@ -1,8 +1,9 @@
-#ifndef SIMPLEASLA_H
+#ifndef SIMPLEASLA_H_
 
-    #define SIMPLEALSA_H
-
+    #define SIMPLEALSA_H_
     #include <alsa/asoundlib.h>
+
+    #include "config.h"
 
 /** MACROS **/
 
@@ -30,62 +31,7 @@
         #define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
     #endif
 
-/** ENUMS **/
-
-/**
- * @brief enum used to return function results
- *
- */
-typedef enum
-{
-    SA_SUCCESS = 0,
-    SA_ERROR   = 1
-} sa_result;
-
-/**
- * @brief enum used to indicate the status of a device
- *
- */
-typedef enum
-{
-    SA_DEVICE_UNINITIALIZED = 0,
-    SA_DEVICE_READY         = 1,
-    SA_DEVICE_STARTED       = 2,
-} sa_device_status;
-
 /** STRUCTS **/
-
-/**
- * @brief struct used to config a simple ALSA devicre
- *
- */
-typedef struct
-{
-    /** Rate at which samples are send through the soundcard */
-    int sampleRate;
-
-    /** Amount of desired audiochannels */
-    int channels;
-
-    /** Defines the size (in µs) of the internal ALSA ring buffer */
-    int bufferTime;
-
-    /** Defines the time (in µs) after which ALSA will wake up to check if the buffer is running
-            empty - increasing this time will increase efficiency, but risk the buffer running empty */
-    int periodTime;
-
-    /** Format of the frames that are send to the ALSA buffer */
-    snd_pcm_format_t format;
-
-    /** Name of the device - this name indicates ALSA to which physical device it must send
-                     audio - the default devices can be used by assigning this variable to "default" */
-    char *device;
-
-    /** Callback function that will be called whenever the internal buffer is running
-                                    empty and new audio samples are required */
-    int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device);
-
-} sa_device_config;
 
 /**
  * @brief struct used to encapsulate a simple ALSA device
@@ -124,6 +70,38 @@ typedef struct
     void *myCustomData;
 
 } sa_device;
+
+/**
+ * @brief struct used to config a simple ALSA devicre
+ *
+ */
+typedef struct
+{
+    /** Rate at which samples are send through the soundcard */
+    int sampleRate;
+
+    /** Amount of desired audiochannels */
+    int channels;
+
+    /** Defines the size (in µs) of the internal ALSA ring buffer */
+    int bufferTime;
+
+    /** Defines the time (in µs) after which ALSA will wake up to check if the buffer is running
+            empty - increasing this time will increase efficiency, but risk the buffer running empty */
+    int periodTime;
+
+    /** Format of the frames that are send to the ALSA buffer */
+    snd_pcm_format_t format;
+
+    /** Name of the device - this name indicates ALSA to which physical device it must send
+                     audio - the default devices can be used by assigning this variable to "default" */
+    char *device;
+
+    /** Callback function that will be called whenever the internal buffer is running
+                                    empty and new audio samples are required */
+    int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device);
+
+} sa_device_config;
 
 /** FUNCTIONS DEFINITIONS **/
 
@@ -174,4 +152,4 @@ sa_result sa_stop_device(sa_device *device);
  */
 sa_result sa_destroy_device(sa_device *device);
 
-#endif  // SIMPLEALSA_H
+#endif  // SIMPLEALSA_H_

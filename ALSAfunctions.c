@@ -1,5 +1,7 @@
 #include "ALSAfunctions.h"
 
+#include "simpleALSA.h"
+
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));
@@ -35,14 +37,12 @@ sa_result init_alsa_device(sa_device *device) {
 
 sa_result start_alsa_device(sa_device *device) {
     sa_poll_management *poll_manager;
-    if(init_poll_management(device, poll_manager) < 0)
+    if(init_poll_management(device, poll_manager) != SA_SUCCESS)
     {
         printf("Could not allocate poll descriptors and pipe\n");
         return SA_ERROR;
     }
-
-    signed short *ptr;
-    int err, cptr, init;
+    write_and_poll_loop(device, poll_manager);
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager) {
@@ -52,7 +52,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
     if(pipe(pipe_fds))
     {
         printf("Cannot create poll_pipe\n");
-        return -1;
+        return SA_ERROR;
     }
 
     if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
@@ -60,7 +60,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
         printf("Failed to make pipe non-blocking\n");
         close(pipe_fds[0]);
         close(pipe_fds[1]);
-        return 0;
+        return SA_ERROR;
     }
 
     poll_manager->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
@@ -75,7 +75,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
     if(poll_manager->ufds == NULL)
     {
         printf("No enough memory\n");
-        return -ENOMEM;
+        return SA_ERROR;
     }
     // store read end of pipe
     poll_manager->ufds[0].fd     = pipe_fds[0];
@@ -86,7 +86,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
     if((err = snd_pcm_poll_descriptors(device->handle, poll_manager->ufds + 1, poll_manager->count - 1)) < 0)
     {
         printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
-        return err;
+        return SA_ERROR;
     }
     return SA_SUCCESS;
 }

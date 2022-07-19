@@ -1,9 +1,8 @@
-#ifndef ALSAFUNCTIONS_H
-#define ALSAFUNCTIONS_H
-
+#ifndef ALSAFUNCTIONS_H_
+#define ALSAFUNCTIONS_H_
 #include <alsa/asoundlib.h>
 
-#include "simpleALSA.h"
+#include "config.h"
 
 /** STRUCTS */
 
@@ -121,4 +120,5 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err);
  * @return sa_result
  */
 sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
-#endif  // ALSAFUNCTIONS_H
+
+#endif  // ALSAFUNCTIONS_H_

@@ -4,7 +4,7 @@ LIBS := -lasound -lm -lsndfile
 
 OUT_PC := -o ./builds/alsaPlayer2.bin
 
-MAIN := ./sipleALSA_main.c
+MAIN := ./simpleALSA_main.c
 EXAMPLE_MAIN:= ./main.c
 FILES := ./ALSAfunctions.c ./simpleALSA.c
 
