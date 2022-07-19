@@ -1,9 +1,8 @@
-#ifndef ALSAFUNCTIONS_H
-#define ALSAFUNCTIONS_H
-
+#ifndef ALSAFUNCTIONS_H_
+#define ALSAFUNCTIONS_H_
 #include <alsa/asoundlib.h>
 
-#include "simpleALSA.h"
+#include "config.h"
 
 /** STRUCTS */
 
@@ -105,4 +104,21 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager);
  */
 int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager);
 
-#endif  // ALSAFUNCTIONS_H
+/**
+ * @brief Try to recover from errors during playback
+ *
+ * @param handle
+ * @param err
+ * @return sa_result
+ */
+sa_result xrun_recovery(snd_pcm_t *handle, int err);
+/**
+ * @brief reclaims sa_device and poll_manager
+ *
+ * @param device
+ * @param poll_manager
+ * @return sa_result
+ */
+sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
+
+#endif  // ALSAFUNCTIONS_H_

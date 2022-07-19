@@ -1,5 +1,7 @@
 #include "ALSAfunctions.h"
 
+#include "simpleALSA.h"
+
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));
@@ -35,14 +37,12 @@ sa_result init_alsa_device(sa_device *device) {
 
 sa_result start_alsa_device(sa_device *device) {
     sa_poll_management *poll_manager;
-    if(init_poll_management(device, poll_manager) < 0)
+    if(init_poll_management(device, poll_manager) != SA_SUCCESS)
     {
         printf("Could not allocate poll descriptors and pipe\n");
         return SA_ERROR;
     }
-
-    signed short *ptr;
-    int err, cptr, init;
+    write_and_poll_loop(device, poll_manager);
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager) {
@@ -52,7 +52,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
     if(pipe(pipe_fds))
     {
         printf("Cannot create poll_pipe\n");
-        return -1;
+        return SA_ERROR;
     }
 
     if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
@@ -60,7 +60,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
         printf("Failed to make pipe non-blocking\n");
         close(pipe_fds[0]);
         close(pipe_fds[1]);
-        return 0;
+        return SA_ERROR;
     }
 
     poll_manager->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
@@ -75,7 +75,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
     if(poll_manager->ufds == NULL)
     {
         printf("No enough memory\n");
-        return -ENOMEM;
+        return SA_ERROR;
     }
     // store read end of pipe
     poll_manager->ufds[0].fd     = pipe_fds[0];
@@ -86,7 +86,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
     if((err = snd_pcm_poll_descriptors(device->handle, poll_manager->ufds + 1, poll_manager->count - 1)) < 0)
     {
         printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
-        return err;
+        return SA_ERROR;
     }
     return SA_SUCCESS;
 }
@@ -108,7 +108,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                    snd_pcm_state(device->handle) == SND_PCM_STATE_SUSPENDED)
                 {
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
-                    if(xrun_recovery(device->handle, err) < 0)
+                    if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
                         printf("Write error: %s\n", snd_strerror(err));
                         exit(EXIT_FAILURE);
@@ -122,7 +122,6 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
             }
         }
         // CALL CALLBACK HERE to fill samples !!
-
         void (*callbackFunction)(int framesToSend, void *audioBuffer,
                                  sa_device *sa_device) = device->config->callbackFunction;
         callbackFunction(device->periodSize, device->samples, device);
@@ -139,7 +138,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
             err = snd_pcm_writei(device->handle, ptr, cptr);
             if(err < 0)
             {
-                if(xrun_recovery(device->handle, err) < 0)
+                if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                 {
                     printf("Write error: %s\n", snd_strerror(err));
                     exit(EXIT_FAILURE);
@@ -162,7 +161,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                    snd_pcm_state(device->handle) == SND_PCM_STATE_SUSPENDED)
                 {
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
-                    if(xrun_recovery(device->handle, err) < 0)
+                    if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
                         printf("Write error: %s\n", snd_strerror(err));
                         exit(EXIT_FAILURE);
@@ -211,10 +210,41 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
     return -1;
 }
 
+sa_result xrun_recovery(snd_pcm_t *handle, int err) {
+    if(err == -EPIPE)
+    { /* under-run */
+        err = snd_pcm_prepare(handle);
+        if(err < 0)
+        {
+            printf("Can't recover from underrun, prepare failed: %s\n", snd_strerror(err));
+            return SA_ERROR;
+        }
+    } else if(err == -ESTRPIPE)
+    {
+        while((err = snd_pcm_resume(handle)) == -EAGAIN)
+        {
+            /* wait until the suspend flag is released */
+            sleep(1);
+        }
+        if(err < 0)
+        {
+            err = snd_pcm_prepare(handle);
+            if(err < 0)
+            {
+                printf("Can't recovery from suspend, prepare failed: %s\n", snd_strerror(err));
+                return SA_ERROR;
+            }
+        }
+        return SA_SUCCESS;
+    }
+    return SA_ERROR;
+}
+
 sa_result pause_alsa_device(sa_device *device) {
     // TODOO DAAN: stop our callback loop here
 
-    if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING) {
+    if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
+    {
         // TODO YANO PAUSE THE DEVICE HERE IN SOME WAY
     }
     return SA_ERROR;
