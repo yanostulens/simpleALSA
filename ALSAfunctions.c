@@ -101,7 +101,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     {
         if(!init)
         {
-            err = wait_for_poll(device->handle, poll_manager->ufds, poll_manager->count);
+            err = wait_for_poll(device->handle, poll_manager);
             if(err < 0)
             {
                 if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
