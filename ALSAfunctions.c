@@ -1,7 +1,5 @@
 #include "ALSAfunctions.h"
 
-#include "simpleALSA.h"
-
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));

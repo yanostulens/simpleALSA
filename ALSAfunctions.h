@@ -3,6 +3,7 @@
 #include <alsa/asoundlib.h>
 
 #include "config.h"
+#include "simpleALSA.h"
 
 /** STRUCTS */
 
