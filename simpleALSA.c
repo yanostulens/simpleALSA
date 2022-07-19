@@ -2,30 +2,31 @@
 
 #include "ALSAfunctions.h"
 
-sa_result sa_init_device_config(sa_device_config *config) {
-    config = malloc(sizeof(sa_device_config));
-    if(!config)
+sa_result sa_init_device_config(sa_device_config **config) {
+    sa_device_config* config_temp = malloc(sizeof(sa_device_config));
+    if(!config_temp)
         return SA_ERROR;
 
-    config->sampleRate       = DEFAULT_SAMPLE_RATE;
-    config->channels         = DEFAULT_NUMBER_OF_CHANNELS;
-    config->bufferTime       = DEFAULT_BUFFER_TIME;
-    config->periodTime       = DEFAULT_PERIOD_TIME;
-    config->format           = DEFAULT_AUDIO_FORMAT;
-    config->device           = DEFAULT_DEVICE;
-    config->callbackFunction = NULL;
-
+    config_temp->sampleRate       = DEFAULT_SAMPLE_RATE;
+    config_temp->channels         = DEFAULT_NUMBER_OF_CHANNELS;
+    config_temp->bufferTime       = DEFAULT_BUFFER_TIME;
+    config_temp->periodTime       = DEFAULT_PERIOD_TIME;
+    config_temp->format           = DEFAULT_AUDIO_FORMAT;
+    config_temp->device           = DEFAULT_DEVICE;
+    config_temp->callbackFunction = NULL;
+    *config = config_temp;
     return SA_SUCCESS;
 }
 
-sa_result sa_init_device(sa_device_config *config, sa_device *device) {
-    device = malloc(sizeof(sa_device));
-    if(!device)
+sa_result sa_init_device(sa_device_config *config, sa_device **device) {
+    sa_device* device_temp = malloc(sizeof(sa_device));
+    if(!device_temp)
         return SA_ERROR;
 
-    device->config = config;
-    device->status = SA_DEVICE_READY;
-    return init_alsa_device(device);
+    device_temp->config = config;
+    device_temp->status = SA_DEVICE_READY;
+    *device = device_temp;
+    return init_alsa_device(*device);
 }
 
 sa_result sa_start_device(sa_device *device) {

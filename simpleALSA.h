@@ -38,7 +38,7 @@
  * @param device - empty pointer into which the config struct is set
  * @return sa_return_status
  */
-sa_result sa_init_device_config(sa_device_config *config);
+sa_result sa_init_device_config(sa_device_config ** config);
 
 /**
  * @brief initializes a new audio device
@@ -46,7 +46,7 @@ sa_result sa_init_device_config(sa_device_config *config);
  * @param device - pointer to the initialized audio device
  * @return sa_return_status
  */
-sa_result sa_init_device(sa_device_config *config, sa_device *device);
+sa_result sa_init_device(sa_device_config *config, sa_device **device);
 
 /**
  * @brief starts the simple ALSA device - which starts the callback loop

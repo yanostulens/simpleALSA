@@ -93,7 +93,7 @@ struct sa_device_config
 
     /** Callback function that will be called whenever the internal buffer is running
                                     empty and new audio samples are required */
-    int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device);
+    void (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device);
 };
 
 #endif /* _CONFIG_H_ */

@@ -19,11 +19,11 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE *infile) {
     fprintf(stderr, "Format: %d\n", sfinfo->format);
 }
 
-int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device) {
+void callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device) {
     int readcount   = 0;
     SNDFILE *infile = (SNDFILE *) sa_device->myCustomData;
     readcount       = sf_readf_short(infile, sa_device->samples, sa_device->periodSize);
-    return readcount;
+    // return readcount;
 }
 
 int main(int argc, char const *argv[]) {
@@ -32,9 +32,10 @@ int main(int argc, char const *argv[]) {
     SNDFILE *infile          = NULL;
     sa_device_config *config = NULL;
     sa_device *device        = NULL;
-    sa_init_device_config(config);
-    config->callbackFunction = callback_function;
-    sa_init_device(config, device);
+    sa_init_device_config(&config);
+
+    config->callbackFunction = &callback_function;
+    sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
     initSndFile(infilename, &sfinfo, infile);
     sa_start_device(device);

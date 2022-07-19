@@ -20,3 +20,9 @@ test_poll: ./main_with_polldescr.c
 
 run:
 	./builds/alsaPlayer2.bin
+
+debug: $(FILES)
+	mkdir -p builds
+	mkdir -p builds
+	$(CC_PC) $(FILES) $(MAIN) $(OUT_PC) $(CFLAGS) -g $(LIBS) -o debugging
+	gdb debugging
