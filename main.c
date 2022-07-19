@@ -16,7 +16,7 @@ static int period_event         = 0;                     /* produce poll event a
 static snd_pcm_sframes_t buffer_size;
 static snd_pcm_sframes_t period_size;
 
-char *infilename = "./audioFiles/afraid.wav";
+char *infilename = "./audioFiles/california.wav";
 SF_INFO sfinfo;
 SNDFILE *infile = NULL;
 
@@ -321,6 +321,7 @@ static int write_and_poll_loop(snd_pcm_t *handle, signed short *samples)
             }
         }
     }
+    return -1;
 }
 
 struct transfer_method
