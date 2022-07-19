@@ -29,5 +29,5 @@ sa_result sa_init_device(sa_device_config *config, sa_device *device) {
 }
 
 sa_result sa_start_device(sa_device *device) {
-    return start_alsa_device();
+    return start_alsa_device(device);
 }
