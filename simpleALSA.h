@@ -1,4 +1,5 @@
 #ifndef SIMPLEASLA_H
+
     #define SIMPLEALSA_H
 
     #include <alsa/asoundlib.h>
@@ -82,7 +83,7 @@ typedef struct
 
     /** Callback function that will be called whenever the internal buffer is running
                                     empty and new audio samples are required */
-    void (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device);
+    int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device);
 
 } sa_device_config;
 
@@ -118,6 +119,9 @@ typedef struct
 
     /** Refers to the pipe which can cancel poll when playback is canceled*/
     int pipe_write_end;
+
+    /** Some pointer to custom set data*/
+    void *myCustomData;
 
 } sa_device;
 

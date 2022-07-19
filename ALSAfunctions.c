@@ -1,5 +1,6 @@
 #include "ALSAfunctions.h"
 
+
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));
@@ -108,7 +109,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                    snd_pcm_state(device->handle) == SND_PCM_STATE_SUSPENDED)
                 {
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
-                    if(xrun_recovery(device->handle, err) < 0)
+                    if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
                         printf("Write error: %s\n", snd_strerror(err));
                         exit(EXIT_FAILURE);
@@ -122,7 +123,6 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
             }
         }
         // CALL CALLBACK HERE to fill samples !!
-
         void (*callbackFunction)(int framesToSend, void *audioBuffer,
                                  sa_device *sa_device) = device->config->callbackFunction;
         callbackFunction(device->periodSize, device->samples, device);
@@ -139,7 +139,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
             err = snd_pcm_writei(device->handle, ptr, cptr);
             if(err < 0)
             {
-                if(xrun_recovery(device->handle, err) < 0)
+                if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                 {
                     printf("Write error: %s\n", snd_strerror(err));
                     exit(EXIT_FAILURE);
@@ -162,7 +162,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                    snd_pcm_state(device->handle) == SND_PCM_STATE_SUSPENDED)
                 {
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
-                    if(xrun_recovery(device->handle, err) < 0)
+                    if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
                         printf("Write error: %s\n", snd_strerror(err));
                         exit(EXIT_FAILURE);
@@ -209,4 +209,34 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
             return 0;
     }
     return -1;
+}
+
+sa_result xrun_recovery(snd_pcm_t *handle, int err) {
+    if(err == -EPIPE)
+    { /* under-run */
+        err = snd_pcm_prepare(handle);
+        if(err < 0)
+        {
+            printf("Can't recover from underrun, prepare failed: %s\n", snd_strerror(err));
+            return SA_ERROR;
+        }
+    } else if(err == -ESTRPIPE)
+    {
+        while((err = snd_pcm_resume(handle)) == -EAGAIN)
+        {
+            /* wait until the suspend flag is released */
+            sleep(1);
+        }
+        if(err < 0)
+        {
+            err = snd_pcm_prepare(handle);
+            if(err < 0)
+            {
+                printf("Can't recovery from suspend, prepare failed: %s\n", snd_strerror(err));
+                return SA_ERROR;
+            }
+        }
+        return SA_SUCCESS;
+    }
+    return SA_ERROR;
 }
