@@ -2,24 +2,28 @@
 
 /** MACROS **/
 
+#if !defined(DEFAULT_DEVICE)
+#define DEFAULT_DEVICE "default"
+#endif // DEFAULT_DEVICE
+
 #if !defined(DEFAULT_SAMPLE_RATE)
-#define DEFAULT_SAMPLE_RATE = 48000
+#define DEFAULT_SAMPLE_RATE 48000
 #endif // DEFAULT_SAMPL_RATE
 
 #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-#define DEFAULT_NUMBER_OF_CHANNELS = 2
+#define DEFAULT_NUMBER_OF_CHANNELS 2
 #endif // DEFAULT_NUMBER_OF_CHANNELS
 
 #if !defined(DEFAULT_AUDIO_FORMAT)
-#define DEFAULT_AUDIO_FORMAT = SND_PCM_FORMAT_S16_LE
+#define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
 #endif // DEFAULT_AUDIO_FORMAT
 
 #if !defined(DEFAULT_BUFFER_TIME)
-#define DEFAULT_BUFFER_TIME = 500000 /** in µS - so half a second here */
+#define DEFAULT_BUFFER_TIME 500000 /** in µS - so half a second here */
 #endif // DEFAULT_BUFFER_TIME
 
 #if !defined(DEFAULT_PERIOD_TIME)
-#define DEFAULT_PERIOD_TIME = 250000 /** in µS - so quarter of a second here */
+#define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
 #endif // DEFAULT_PERIOD_TIME
 
 
