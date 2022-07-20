@@ -71,6 +71,14 @@ sa_result start_alsa_device(sa_device *device);
 sa_result pause_alsa_device(sa_device *device);
 
 /**
+ * @brief Unpauses the ALSA device and starts the callback loop again
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result unpause_alsa_device(sa_device *device);
+
+/**
  * @brief Pauses the ALSA device and the callback loop and drains all the existing data
  *
  * @param device
@@ -152,5 +160,13 @@ sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
  * @return sa_result
  */
 sa_result messagePipe(sa_device *device, char toSend);
+/**
+ * @brief pauzes the callback loop
+ *
+ * @param poll_managerµ
+ * @param handle
+ * @return sa_result
+ */
+sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, snd_pcm_t *handle);
 
 #endif  // ALSAFUNCTIONS_H_

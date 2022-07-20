@@ -251,7 +251,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
 
 void *initPlaybackThread(void *data) {
     sa_thread_data *thread_data = (sa_thread_data *) data;
-    sa_result x = write_and_poll_loop(thread_data->device, thread_data->poll_manager);
+    sa_result x                 = write_and_poll_loop(thread_data->device, thread_data->poll_manager);
     printf("Playback has ended, can join the thread\n");
     return NULL;
 }
@@ -355,7 +355,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
 
 int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
     unsigned short revents;
-
+    char command;
     while(1)
     {
         /** A period is the number of frames in between each hardware interrupt. The poll() will return once a period */
@@ -363,7 +363,6 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
 
         if(poll_manager->ufds[0].revents & POLLIN)
         {
-            char command;
             if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
             {
                 printf("Pipe read error\n");
@@ -376,7 +375,10 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
                     printf("Pipe requests skip\n");
                     return SA_CANCEL;
                     break;
-                // TODO ADD COMMAND HANDELERS
+                case 'p':
+                    if(pauzeCallbackLoop(poll_manager, handle) == SA_CANCEL)
+                    { return SA_CANCEL; }
+                    break;
                 default:
                     printf("Invalid command send to pipe\n");
                     break;
@@ -389,11 +391,42 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
             if(revents & POLLERR)
                 return -EIO;
             if(revents & POLLOUT)
-                return 0;
+                return SA_SUCCESS;
         }
     }
     printf("Poll loop ended without proper return\n");
     return -1;
+}
+
+sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, snd_pcm_t *handle) {
+    int pauzed = 1;
+    char command;
+    while(pauzed)
+    {
+        poll(&(poll_manager->ufds[0]), 1, -1);
+        if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
+        {
+            printf("Pipe read error\n");
+        } else
+        {
+            switch(command)
+            {
+            // Completely cancel
+            case 's':
+                printf("Pipe requests skip\n");
+                return SA_CANCEL;
+                break;
+            // Can play again
+            case 'p':
+                printf("Unpaused\n");
+                return SA_SUCCESS;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    return SA_ERROR;
 }
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
@@ -427,18 +460,38 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
 }
 
 sa_result pause_alsa_device(sa_device *device) {
-    // TODOO DAAN: stop our callback loop here
+    if(messagePipe(device, 'p') == SA_ERROR)
+    {
+        printf("Could not pauze playback\n");
+        return SA_ERROR;
+    };
 
     if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
     {
         // TODO YANO PAUSE THE DEVICE HERE IN SOME WAY
     }
-    return SA_ERROR;
+    return SA_SUCCESS;
+}
+
+sa_result unpause_alsa_device(sa_device *device) {
+    if(messagePipe(device, 'p') == SA_ERROR)
+    {
+        printf("Could not unpauze playback\n");
+        return SA_ERROR;
+    };
+    return SA_SUCCESS;
 }
 
 sa_result stop_alsa_device(sa_device *device) {
-    // TODOO DAAN: stop our callback loop here
-    return SA_ERROR;
+    if(messagePipe(device, 's') == SA_ERROR)
+    {
+        printf("Could not cancel playback\n");
+        return SA_ERROR;
+    };
+    if(closePlaybackThread(device) == SA_ERROR)
+    { return SA_ERROR; }
+    return drain_alsa_device(device);
+    // TODO CLEANUP
 }
 
 sa_result drain_alsa_device(sa_device *device) {

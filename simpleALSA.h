@@ -64,6 +64,15 @@ sa_result sa_start_device(sa_device *device);
  */
 sa_result sa_pause_device(sa_device *device);
 
+
+/**
+ * @brief unpauses the simple ALSA device - which pauses the callback loop
+ *
+ * @param device - device to unpause
+ * @return sa_result
+ */
+sa_result sa_unpause_device(sa_device *device);
+
 /**
  * @brief stops a simple ALSA device - same as pause but in addation, all buffer data is dropped
  *
