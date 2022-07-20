@@ -25,26 +25,37 @@ void callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device
     SNDFILE *infile = (SNDFILE *) sa_device->myCustomData;
     if(!(readcount = sf_readf_short(infile, sa_device->samples, sa_device->periodSize) > 0))
     { printf("file end was reached\n"); }
-    printf("Readcount: %i\n", readcount);
-
-    // return readcount;
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/california.wav";
+    char *infilename = "./audioFiles/afraid.wav";
     SF_INFO sfinfo;
     SNDFILE *infile          = NULL;
     sa_device_config *config = NULL;
     sa_device *device        = NULL;
     sa_init_device_config(&config);
 
-    config->callbackFunction = &callback_function;
-    sa_init_device(config, &device);
     initSndFile(infilename, &sfinfo, &infile);
+    config->callbackFunction = &callback_function;
+    config->sampleRate       = sfinfo.samplerate;
+    sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
-    sa_start_device(device);
 
-    char c = fgetc(stdin);
+    while(1)
+    {
+        printf("Give a command please...\n");
+        char input[20];
+        fgets(input, 20, stdin);
+
+        if(strcmp(input, "play\n") == 0)
+        {
+            sa_start_device(device);
+            printf("Devive started");
+        } else if(strcmp(input, "pause\n") == 0)
+        {
+        } else if(strcmp(input, "stop\n") == 0)
+        {}
+    }
 
     return 0;
 }
