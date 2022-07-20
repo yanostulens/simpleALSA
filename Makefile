@@ -13,6 +13,11 @@ pc: $(FILES)
 	mkdir -p builds
 	$(CC_PC) $(FILES) $(MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
 
+example: $(EXAMPLE_MAIN)
+	mkdir -p builds
+	mkdir -p builds
+	$(CC_PC) $(FILES) $(EXAMPLE_MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
+
 test_poll: ./main_with_polldescr.c
 	mkdir -p builds
 	mkdir -p builds
