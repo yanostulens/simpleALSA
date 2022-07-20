@@ -180,7 +180,7 @@ sa_result set_swparams(sa_device *device) {
 
 sa_result start_alsa_device(sa_device *device) {
     sa_poll_management *poll_manager = NULL;
-    if(init_poll_management(device, poll_manager) != SA_SUCCESS)
+    if(init_poll_management(device, &poll_manager) != SA_SUCCESS)
     {
         printf("Could not allocate poll descriptors and pipe\n");
         return SA_ERROR;
@@ -189,8 +189,8 @@ sa_result start_alsa_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager) {
-    poll_manager = (sa_poll_management *) malloc(sizeof(sa_poll_management));
+sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager) {
+    sa_poll_management *poll_manager_temp = (sa_poll_management *) malloc(sizeof(sa_poll_management));
     int pipe_fds[2];  // store me somewhere (later)
     int err;
     if(pipe(pipe_fds))
@@ -207,31 +207,33 @@ sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manag
         return SA_ERROR;
     }
 
-    poll_manager->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
+    poll_manager_temp->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
     // there must be at least one alsa descriptor
-    if(poll_manager->count <= 1)
+    if(poll_manager_temp->count <= 1)
     {
         printf("Invalid poll descriptors count\n");
-        return poll_manager->count;
+        return poll_manager_temp->count;
     }
 
-    poll_manager->ufds = malloc(sizeof(struct pollfd) * (poll_manager->count));
-    if(poll_manager->ufds == NULL)
+    poll_manager_temp->ufds = malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
+    if(poll_manager_temp->ufds == NULL)
     {
         printf("No enough memory\n");
         return SA_ERROR;
     }
     // store read end of pipe
-    poll_manager->ufds[0].fd     = pipe_fds[0];
-    poll_manager->ufds[0].events = POLLIN;
+    poll_manager_temp->ufds[0].fd     = pipe_fds[0];
+    poll_manager_temp->ufds[0].events = POLLIN;
     // store the write end
-    device->pipe_write_end       = pipe_fds[1];
+    device->pipe_write_end            = pipe_fds[1];
     // dont give ALSA the first poll descriptor
-    if((err = snd_pcm_poll_descriptors(device->handle, poll_manager->ufds + 1, poll_manager->count - 1)) < 0)
+    if((err = snd_pcm_poll_descriptors(device->handle, poll_manager_temp->ufds + 1,
+                                       poll_manager_temp->count - 1)) < 0)
     {
         printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
         return SA_ERROR;
     }
+    *poll_manager = poll_manager_temp;
     return SA_SUCCESS;
 }
 
@@ -268,6 +270,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
         // CALL CALLBACK HERE to fill samples !!
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device) =
           (int (*)(int, void *, sa_device *)) device->config->callbackFunction;
+
         callbackFunction(device->periodSize, device->samples, device);
         // if(!(readcount = sf_readf_short(infile, samples, period_size) > 0))
         //{ break; }

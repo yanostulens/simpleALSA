@@ -82,7 +82,7 @@ sa_result drain_alsa_device(sa_device *device);
  * @param poll_manager, nullpointer to initialize
  * @return sa_result
  */
-sa_result init_poll_management(sa_device *device, sa_poll_management *poll_manager);
+sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager);
 
 /**
  * @brief Plays audio by repeatedly calling the callback function for framas
