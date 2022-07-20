@@ -153,12 +153,4 @@ sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
  */
 sa_result messagePipe(sa_device *device, char toSend);
 
-/**
- * @brief handles a command received in the pipe
- *
- * @param command
- * @return sa_result
- */
-sa_result handlePipeCommand(char command);
-
 #endif  // ALSAFUNCTIONS_H_

@@ -9,8 +9,10 @@
  */
 typedef enum sa_result
 {
+    SA_ERROR   = -1,
     SA_SUCCESS = 0,
-    SA_ERROR   = 1
+    SA_CANCEL  = 1,
+
 } sa_result;
 
 /**

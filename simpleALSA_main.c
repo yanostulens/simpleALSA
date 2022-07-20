@@ -24,18 +24,18 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device)
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/bigdogs.wav";
+    char *infilename = "./audioFiles/california.wav";
     SF_INFO sfinfo;
-    SNDFILE *infile          = NULL;
-    
+    SNDFILE *infile = NULL;
+
     sa_device_config *config = NULL;
     sa_device *device        = NULL;
     sa_init_device_config(&config);
 
     initSndFile(infilename, &sfinfo, &infile);
     config->callbackFunction = &callback_function;
-    config->sampleRate       = sfinfo.samplerate;
-    config->channels         = sfinfo.channels;
+    // config->sampleRate       = sfinfo.samplerate;
+    // config->channels         = sfinfo.channels;
 
     sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
@@ -52,7 +52,7 @@ int main(int argc, char const *argv[]) {
         {
         } else if(strcmp(input, "stop\n") == 0)
         {
-        } else if(strcmp(input, "command\n") == 0)
+        } else if(strcmp(input, "skip\n") == 0)
         { messagePipe(device, 's'); }
     }
 

@@ -251,7 +251,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
 
 void *initPlaybackThread(void *data) {
     sa_thread_data *thread_data = (sa_thread_data *) data;
-    write_and_poll_loop(thread_data->device, thread_data->poll_manager);
+    sa_result x = write_and_poll_loop(thread_data->device, thread_data->poll_manager);
     printf("Playback has ended, can join the thread\n");
     return NULL;
 }
@@ -291,7 +291,8 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     printf("Wait for poll failed\n");
                     return SA_ERROR;
                 }
-            }
+            } else if(err == SA_CANCEL)
+            { return SA_CANCEL; }
         }
         // CALL CALLBACK HERE to fill samples !!
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device) =
@@ -341,7 +342,8 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     printf("Wait for poll failed\n");
                     return SA_ERROR;
                 }
-            }
+            } else if(err == SA_CANCEL)
+            { return SA_CANCEL; }
         }
     }
     return SA_SUCCESS;
@@ -366,32 +368,32 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
             {
                 printf("Pipe read error\n");
             } else
-            { handlePipeCommand(command); }
+            {
+                switch(command)
+                {
+                // skip
+                case 's':
+                    printf("Pipe requests skip\n");
+                    return SA_CANCEL;
+                    break;
+                // TODO ADD COMMAND HANDELERS
+                default:
+                    printf("Invalid command send to pipe\n");
+                    break;
+                }
+            }
+        } else
+        {
+            snd_pcm_poll_descriptors_revents(handle, poll_manager->ufds + 1, poll_manager->count - 1,
+                                             &revents);
+            if(revents & POLLERR)
+                return -EIO;
+            if(revents & POLLOUT)
+                return 0;
         }
-
-        snd_pcm_poll_descriptors_revents(handle, poll_manager->ufds + 1, poll_manager->count - 1, &revents);
-        if(revents & POLLERR)
-            return -EIO;
-        if(revents & POLLOUT)
-            return 0;
     }
+    printf("Poll loop ended without proper return\n");
     return -1;
-}
-
-sa_result handlePipeCommand(char command) {
-    switch(command)
-    {
-    // skip
-    case 's':
-        printf("Pipe requests skip\n");
-        break;
-    // TODO ADD COMMAND HANDELERS
-    default:
-        printf("Invalid command send to pipe\n");
-        return SA_ERROR;
-        break;
-    }
-    return SA_SUCCESS;
 }
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
