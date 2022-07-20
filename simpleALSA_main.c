@@ -1,5 +1,3 @@
-#include <alsa/asoundlib.h>
-#include <math.h>
 #include <sndfile.h>
 #include <stdio.h>
 
@@ -26,8 +24,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device)
 }
 
 int main(int argc, char const *argv[]) {
-    // char *infilename = "./audioFiles/big_dogs.wav";
-    char *infilename = "./audioFiles/california.wav";
+    char *infilename = "./audioFiles/bigdogs.wav";
     SF_INFO sfinfo;
     SNDFILE *infile          = NULL;
     
@@ -38,6 +35,8 @@ int main(int argc, char const *argv[]) {
     initSndFile(infilename, &sfinfo, &infile);
     config->callbackFunction = &callback_function;
     config->sampleRate       = sfinfo.samplerate;
+    config->channels         = sfinfo.channels;
+
     sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
     while(1)
@@ -49,7 +48,6 @@ int main(int argc, char const *argv[]) {
         if(strcmp(input, "play\n") == 0)
         {
             sa_start_device(device);
-            printf("Devive started");
         } else if(strcmp(input, "pause\n") == 0)
         {
         } else if(strcmp(input, "stop\n") == 0)
