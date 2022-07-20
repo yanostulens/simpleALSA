@@ -417,7 +417,7 @@ sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, snd_pcm_t *handle)
                 return SA_CANCEL;
                 break;
             // Can play again
-            case 'p':
+            case 'u':
                 printf("Unpaused\n");
                 return SA_SUCCESS;
                 break;
@@ -460,6 +460,7 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
 }
 
 sa_result pause_alsa_device(sa_device *device) {
+    drain_alsa_device(device);
     if(messagePipe(device, 'p') == SA_ERROR)
     {
         printf("Could not pauze playback\n");
@@ -474,7 +475,7 @@ sa_result pause_alsa_device(sa_device *device) {
 }
 
 sa_result unpause_alsa_device(sa_device *device) {
-    if(messagePipe(device, 'p') == SA_ERROR)
+    if(messagePipe(device, 'u') == SA_ERROR)
     {
         printf("Could not unpauze playback\n");
         return SA_ERROR;
