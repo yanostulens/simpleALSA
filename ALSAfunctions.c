@@ -90,7 +90,7 @@ sa_result set_hwparams(sa_device *device, snd_pcm_access_t access) {
     }
     /* set the buffer time */
     err = snd_pcm_hw_params_set_buffer_time_near(device->handle, device->hwparams,
-                                                 &(device->config->bufferTime), &dir);
+                                                 (unsigned int *) &(device->config->bufferTime), &dir);
     if(err < 0)
     {
         printf("Unable to set buffer time %u for playback: %s\n", device->config->bufferTime,
@@ -106,7 +106,7 @@ sa_result set_hwparams(sa_device *device, snd_pcm_access_t access) {
     device->bufferSize = size;
     /* set the period time */
     err                = snd_pcm_hw_params_set_period_time_near(device->handle, device->hwparams,
-                                                 &(device->config->periodTime), &dir);
+                                                 (unsigned int *) &(device->config->periodTime), &dir);
     if(err < 0)
     {
         printf("Unable to set period time %u for playback: %s\n", device->config->periodTime,
@@ -242,7 +242,6 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     int err, cptr, init;
 
     init          = 1;
-    int readcount = 0;
     while(1)
     {
         if(!init)
@@ -272,11 +271,6 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
           (int (*)(int, void *, sa_device *)) device->config->callbackFunction;
 
         callbackFunction(device->periodSize, device->samples, device);
-        // if(!(readcount = sf_readf_short(infile, samples, period_size) > 0))
-        //{ break; }
-
-        printf("Readcount: %i\n", readcount);
-        printf("Periodsize: %ld\n", device->periodSize);
 
         ptr  = device->samples;
         cptr = device->periodSize;
