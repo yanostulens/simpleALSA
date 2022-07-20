@@ -45,14 +45,14 @@ sa_result init_alsa_device(sa_device *device);
  * @param access
  * @return sa_result
  */
-sa_result set_hwparams(sa_device *device, snd_pcm_access_t access);
+sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access);
 /**
  * @brief Sets the ALSA software parameters
  *
  * @param device
  * @return sa_result
  */
-sa_result set_swparams(sa_device *device);
+sa_result set_software_parameters(sa_device *device);
 
 /**
  * @brief Starts the ALSA write and wait loop
@@ -63,7 +63,7 @@ sa_result set_swparams(sa_device *device);
 sa_result start_alsa_device(sa_device *device);
 
 /**
- * @brief Pauses the ALSA device and stops the callback loop to the simpleALSA callback
+ * @brief Sends out a message to the transfer loop to pause audio output
  *
  * @param device
  * @return sa_result
@@ -109,14 +109,14 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
  * @param data: a sa_thread_data packet
  *
  */
-void *initPlaybackThread(void *data);
+void *init_playback_thread(void *data);
 /**
  * @brief Attempts to join the playback thread
  *
  * @param device
  * @return sa_result
  */
-sa_result closePlaybackThread(sa_device *device);
+sa_result close_playback_thread(sa_device *device);
 
 /**
  * @brief Plays audio by repeatedly calling the callback function for framas
@@ -134,7 +134,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
  * @param poll_manager
  * @return int
  */
-int wait_for_poll(sa_device* device, sa_poll_management *poll_manager);
+int wait_for_poll(sa_device *device, sa_poll_management *poll_manager);
 
 /**
  * @brief Try to recover from errors during playback
@@ -159,7 +159,7 @@ sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
  * @param toSend
  * @return sa_result
  */
-sa_result messagePipe(sa_device *device, char toSend);
+sa_result message_pipe(sa_device *device, char toSend);
 /**
  * @brief pauzes the callback loop
  *
@@ -167,14 +167,31 @@ sa_result messagePipe(sa_device *device, char toSend);
  * @param handle
  * @return sa_result
  */
-sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, sa_device* device);
+sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device);
+
+/**
+ * @brief Check whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
+ * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_drain().
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result pause_PCM_handle(sa_device *device);
+
+/**
+ * @brief Check whether the pcm was paused using snd_pcm_pause() or not and resume the pcm accordingly.
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result unpause_PCM_handle(sa_device *device);
 
 /**
  * @brief Prepares the ALSA device so it is ready for a restart
- * 
- * @param device 
- * @return sa_result 
+ *
+ * @param device
+ * @return sa_result
  */
-sa_result prepare_alsa_device(sa_device* device);
+sa_result prepare_alsa_device(sa_device *device);
 
 #endif  // ALSAFUNCTIONS_H_

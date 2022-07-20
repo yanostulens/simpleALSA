@@ -13,12 +13,12 @@ sa_result init_alsa_device(sa_device *device) {
         exit(EXIT_FAILURE);
     }
 
-    if((err = set_hwparams(device, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
+    if((err = set_hardware_parameters(device, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
     {
         printf("Setting of hwparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
-    if((err = set_swparams(device)) < 0)
+    if((err = set_software_parameters(device)) < 0)
     {
         printf("Setting of swparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
@@ -27,15 +27,21 @@ sa_result init_alsa_device(sa_device *device) {
     device->samples = (signed short *) malloc((device->periodSize * device->config->channels *
                                                snd_pcm_format_physical_width(device->config->format)) /
                                               8);
+
     if(device->samples == NULL)
+    { exit(EXIT_FAILURE); }
+
+    device->supportsPause = snd_pcm_hw_params_can_pause(device->hwparams);
+    if(device->supportsPause)
     {
-        printf("No enough memory\n");
-        exit(EXIT_FAILURE);
-    }
+        printf("Device supports snd_pcm_pause()\n");
+    } else
+    { printf("Device does not support snd_pcm_pause()\n"); }
+
     return SA_SUCCESS;
 }
 
-sa_result set_hwparams(sa_device *device, snd_pcm_access_t access) {
+sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     unsigned int rrate;
     snd_pcm_uframes_t size;
     int err, dir;
@@ -132,7 +138,7 @@ sa_result set_hwparams(sa_device *device, snd_pcm_access_t access) {
     return SA_SUCCESS;
 }
 
-sa_result set_swparams(sa_device *device) {
+sa_result set_software_parameters(sa_device *device) {
     int err;
 
     /* get the current swparams */
@@ -192,7 +198,7 @@ sa_result start_alsa_device(sa_device *device) {
     thread_data->device         = device;
     thread_data->poll_manager   = poll_manager;
     // NULL for default thread attributes
-    if(pthread_create(&device->playbackThread, NULL, &initPlaybackThread, (void *) thread_data) != 0)
+    if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
     {
         printf("Couldnt create playback thread\n");
         return SA_ERROR;
@@ -249,14 +255,14 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     return SA_SUCCESS;
 }
 
-void *initPlaybackThread(void *data) {
+void *init_playback_thread(void *data) {
     sa_thread_data *thread_data = (sa_thread_data *) data;
     write_and_poll_loop(thread_data->device, thread_data->poll_manager);
     printf("Playback has ended, can join the thread\n");
     return NULL;
 }
 
-sa_result closePlaybackThread(sa_device *device) {
+sa_result close_playback_thread(sa_device *device) {
     if(pthread_join(device->playbackThread, NULL) != 0)
     {
         printf("Could not join playback thread\n");
@@ -349,10 +355,6 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
     return SA_SUCCESS;
 }
 
-/*
- *   Transfer method - write and wait for room in buffer using poll
- */
-
 int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
     unsigned short revents;
     char command;
@@ -370,13 +372,15 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
             {
                 switch(command)
                 {
-                // skip
+                /** Stop playack */
                 case 's':
-                    printf("Pipe requests skip\n");
+                    drain_alsa_device(device);
+                    prepare_alsa_device(device);
                     return SA_CANCEL;
                     break;
+                /** Pause playback */
                 case 'p':
-                    if(pauzeCallbackLoop(poll_manager, device) == SA_CANCEL)
+                    if(pause_callback_loop(poll_manager, device) == SA_CANCEL)
                     { return SA_CANCEL; }
                     break;
                 default:
@@ -398,9 +402,8 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
     return -1;
 }
 
-sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, sa_device *device) {
-    drain_alsa_device(device);
-    prepare_alsa_device(device);
+sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device) {
+    pause_PCM_handle(device);
 
     int pauzed = 1;
     char command;
@@ -414,14 +417,15 @@ sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, sa_device *device)
         {
             switch(command)
             {
-            // Completely cancel
+            /** Stop playback */
             case 's':
-                printf("Pipe requests skip\n");
+                drain_alsa_device(device);
+                prepare_alsa_device(device);
                 return SA_CANCEL;
                 break;
-            // Can play again
+            /** Unpause */
             case 'u':
-                printf("Unpaused\n");
+                unpause_PCM_handle(device);
                 return SA_SUCCESS;
                 break;
             default:
@@ -463,21 +467,16 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
 }
 
 sa_result pause_alsa_device(sa_device *device) {
-    if(messagePipe(device, 'p') == SA_ERROR)
+    if(message_pipe(device, 'p') == SA_ERROR)
     {
         printf("Could not pauze playback\n");
         return SA_ERROR;
     };
-
-    if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
-    {
-        // TODO YANO PAUSE THE DEVICE HERE IN SOME WAY
-    }
     return SA_SUCCESS;
 }
 
 sa_result unpause_alsa_device(sa_device *device) {
-    if(messagePipe(device, 'u') == SA_ERROR)
+    if(message_pipe(device, 'u') == SA_ERROR)
     {
         printf("Could not unpauze playback\n");
         return SA_ERROR;
@@ -486,42 +485,64 @@ sa_result unpause_alsa_device(sa_device *device) {
 }
 
 sa_result stop_alsa_device(sa_device *device) {
-    if(messagePipe(device, 's') == SA_ERROR)
+    if(message_pipe(device, 's') == SA_ERROR)
     {
         printf("Could not cancel playback\n");
         return SA_ERROR;
     };
-    if(closePlaybackThread(device) == SA_ERROR)
-    { return SA_ERROR; }
-    return drain_alsa_device(device);
+    return close_playback_thread(device);
     // TODO CLEANUP
 }
 
-sa_result drain_alsa_device(sa_device *device) {
-    if(device->handle)
+sa_result pause_PCM_handle(sa_device *device) {
+    printf("Entered the pausePCMHandle function\n");
+    if(device->supportsPause)
     {
-        if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
+        if(snd_pcm_pause(device->handle, 1) != 0)
         {
-            snd_pcm_drain(device->handle);
+            printf("Failed to snd_pcm_pause() the pcm handle\n");
+            return SA_ERROR;
+        }
+        printf("Device pause with snd_pcm_pause()\n");
+        return SA_SUCCESS;
+    } else
+    {
+        printf("Device paused alternatively\n");
+        if(drain_alsa_device(device) == SA_SUCCESS && prepare_alsa_device(device) == SA_SUCCESS)
             return SA_SUCCESS;
+    }
+    return SA_ERROR;
+}
+
+sa_result unpause_PCM_handle(sa_device *device) {
+    if(device->supportsPause)
+    {
+        printf("Resuming with snd_pcm_pause()\n");
+        if(snd_pcm_pause(device->handle, 0) != 0)
+        {
+            printf("Failed to resume the paused pcm handle\n");
+            return SA_ERROR;
         }
     }
+    return SA_SUCCESS;
+}
+
+sa_result drain_alsa_device(sa_device *device) {
+    if(device->handle && snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING &&
+       snd_pcm_drop(device->handle) == 0)
+    { return SA_SUCCESS; }
     printf("Failed to drain ALSA device");
     return SA_ERROR;
 }
 
 sa_result prepare_alsa_device(sa_device *device) {
-    if(snd_pcm_prepare(device->handle) == 0)
-    {
-        return SA_SUCCESS;
-    } else
-    {
-        printf("Failed to prepare the ALSA device");
-        return SA_ERROR;
-    }
+    if(device->handle && snd_pcm_prepare(device->handle) == 0)
+    { return SA_SUCCESS; }
+    printf("Failed to prepare the ALSA device");
+    return SA_ERROR;
 }
 
-sa_result messagePipe(sa_device *device, char toSend) {
+sa_result message_pipe(sa_device *device, char toSend) {
     int result = write(device->pipe_write_end, &toSend, 1);
     if(result != 1)
     {

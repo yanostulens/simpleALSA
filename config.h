@@ -1,6 +1,8 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#include <stdbool.h>
+
 /** ENUMS **/
 
 /**
@@ -65,6 +67,9 @@ struct sa_device
 
     /** Pointer to the place is memory where audio samples are written right before being send to the ALSA buffer */
     signed short *samples;
+
+    /** Indicates support for the hardware to pause the pcm stream */
+    bool supportsPause;
 
     /** TODO */
     snd_pcm_sframes_t bufferSize;

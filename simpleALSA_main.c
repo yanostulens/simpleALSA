@@ -24,7 +24,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device)
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/california.wav";
+    char *infilename = "./audioFiles/afraid.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -34,8 +34,8 @@ int main(int argc, char const *argv[]) {
 
     initSndFile(infilename, &sfinfo, &infile);
     config->callbackFunction = &callback_function;
-    // config->sampleRate       = sfinfo.samplerate;
-    // config->channels         = sfinfo.channels;
+    config->sampleRate       = sfinfo.samplerate;
+    config->channels         = sfinfo.channels;
 
     sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
@@ -55,7 +55,10 @@ int main(int argc, char const *argv[]) {
         {
             sa_unpause_device(device);
         } else if(strcmp(input, "stop\n") == 0)
-        { sa_stop_device(device); }
+        {
+            sa_stop_device(device);
+            sf_seek(infile, 0, SEEK_SET);
+        }
     }
 
     return 0;
