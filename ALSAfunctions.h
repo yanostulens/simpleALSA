@@ -169,4 +169,12 @@ sa_result messagePipe(sa_device *device, char toSend);
  */
 sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, snd_pcm_t *handle);
 
+/**
+ * @brief Prepares the ALSA device so it is ready for a restart
+ * 
+ * @param device 
+ * @return sa_result 
+ */
+sa_result prepare_alsa_device(sa_device* device);
+
 #endif  // ALSAFUNCTIONS_H_
