@@ -24,6 +24,18 @@ typedef enum
     SA_DEVICE_STARTED       = 2,
 } sa_device_status;
 
+/**
+ * @brief enum to identify different types of logs
+ *
+ */
+typedef enum
+{
+    MESSAGE = 0,
+    DEBUG   = 1,
+    WARNING = 2,
+    ERROR   = 3
+} sa_log_type;
+
 /** STRUCTS **/
 typedef struct sa_device sa_device;
 typedef struct sa_device_config sa_device_config;
