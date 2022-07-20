@@ -43,5 +43,8 @@ int main(int argc, char const *argv[]) {
     initSndFile(infilename, &sfinfo, &infile);
     device->myCustomData = (void *) infile;
     sa_start_device(device);
+
+    char c = fgetc(stdin);
+
     return 0;
 }

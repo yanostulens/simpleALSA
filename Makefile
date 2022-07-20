@@ -1,6 +1,6 @@
 CC_PC := gcc
 CFLAGS := -Wall
-LIBS := -lasound -lm -lsndfile
+LIBS := -lasound -lm -lsndfile -lpthread
 
 OUT_PC := -o ./builds/alsaPlayer2.bin
 

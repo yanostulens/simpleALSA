@@ -1,3 +1,5 @@
+#include <pthread.h>
+
 #include "ALSAfunctions.h"
 
 sa_result init_alsa_device(sa_device *device) {
@@ -185,7 +187,16 @@ sa_result start_alsa_device(sa_device *device) {
         printf("Could not allocate poll descriptors and pipe\n");
         return SA_ERROR;
     }
-    write_and_poll_loop(device, poll_manager);
+
+    sa_thread_data *thread_data = (sa_thread_data *) malloc(sizeof(sa_thread_data));
+    thread_data->device         = device;
+    thread_data->poll_manager   = poll_manager;
+    // NULL for default thread attributes
+    if(pthread_create(&device->playbackThread, NULL, &initPlaybackThread, (void *) thread_data) != 0)
+    {
+        printf("Couldnt create playback thread\n");
+        return 0;
+    }
     return SA_SUCCESS;
 }
 
@@ -235,6 +246,11 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     }
     *poll_manager = poll_manager_temp;
     return SA_SUCCESS;
+}
+
+sa_result initPlaybackThread(void *data) {
+    sa_thread_data *thread_data = (sa_thread_data *) data;
+    write_and_poll_loop(thread_data->device, thread_data->poll_manager);
 }
 
 int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {

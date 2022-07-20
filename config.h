@@ -63,6 +63,8 @@ struct sa_device
 
     /** Some pointer to custom set data*/
     void *myCustomData;
+
+    pthread_t playbackThread;
 };
 
 /**
