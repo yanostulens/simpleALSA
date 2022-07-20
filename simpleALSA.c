@@ -24,7 +24,6 @@ sa_result sa_init_device(sa_device_config *config, sa_device **device) {
         return SA_ERROR;
 
     device_temp->config = config;
-    device_temp->status = SA_DEVICE_READY;
     *device             = device_temp;
     return init_alsa_device(*device);
 }
@@ -39,8 +38,4 @@ sa_result sa_stop_device(sa_device *device) {
 
 sa_result sa_pause_device(sa_device *device) {
     return pause_alsa_device(device);
-}
-
-sa_result sa_unpause_device(sa_device *device) {
-    return unpause_alsa_device(device);
 }

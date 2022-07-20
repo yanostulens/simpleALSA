@@ -18,17 +18,6 @@ typedef enum sa_result
 } sa_result;
 
 /**
- * @brief enum used to indicate the status of a device
- *
- */
-typedef enum
-{
-    SA_DEVICE_UNINITIALIZED = 0,
-    SA_DEVICE_READY         = 1,
-    SA_DEVICE_STARTED       = 2,
-} sa_device_status;
-
-/**
  * @brief enum to identify different types of logs
  *
  */
@@ -52,9 +41,6 @@ struct sa_device
 {
     /** Pointer to the configuration settings of the device*/
     sa_device_config *config;
-
-    /** Enum indicating the status of the device */
-    sa_device_status status;
 
     /** Pointer to the ALSA PCM handle struct */
     snd_pcm_t *handle;

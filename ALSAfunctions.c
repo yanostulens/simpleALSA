@@ -187,23 +187,30 @@ sa_result set_software_parameters(sa_device *device) {
 }
 
 sa_result start_alsa_device(sa_device *device) {
-    sa_poll_management *poll_manager = NULL;
-    if(init_poll_management(device, &poll_manager) != SA_SUCCESS)
+    if(snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED)
     {
-        printf("Could not allocate poll descriptors and pipe\n");
-        return SA_ERROR;
-    }
+        unpause_alsa_device(device);
+        return SA_SUCCESS;
+    } else
+    {
+        sa_poll_management *poll_manager = NULL;
+        if(init_poll_management(device, &poll_manager) != SA_SUCCESS)
+        {
+            printf("Could not allocate poll descriptors and pipe\n");
+            return SA_ERROR;
+        }
 
-    sa_thread_data *thread_data = (sa_thread_data *) malloc(sizeof(sa_thread_data));
-    thread_data->device         = device;
-    thread_data->poll_manager   = poll_manager;
-    // NULL for default thread attributes
-    if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
-    {
-        printf("Couldnt create playback thread\n");
-        return SA_ERROR;
+        sa_thread_data *thread_data = (sa_thread_data *) malloc(sizeof(sa_thread_data));
+        thread_data->device         = device;
+        thread_data->poll_manager   = poll_manager;
+        // NULL for default thread attributes
+        if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
+        {
+            printf("Couldnt create playback thread\n");
+            return SA_ERROR;
+        }
+        return SA_SUCCESS;
     }
-    return SA_SUCCESS;
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager) {

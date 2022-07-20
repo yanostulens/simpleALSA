@@ -32,7 +32,7 @@ typedef struct
 /** FUNCTIONS */
 
 /**
- * @brief Initialized an ALSA device
+ * @brief Initialized an ALSA device and store some settings in de sa_device
  *
  * @return sa_result
  */
@@ -71,7 +71,7 @@ sa_result start_alsa_device(sa_device *device);
 sa_result pause_alsa_device(sa_device *device);
 
 /**
- * @brief Unpauses the ALSA device and starts the callback loop again
+ * @brief Sends out a message to the transfer loop to unpause audio output
  *
  * @param device
  * @return sa_result
@@ -79,7 +79,7 @@ sa_result pause_alsa_device(sa_device *device);
 sa_result unpause_alsa_device(sa_device *device);
 
 /**
- * @brief Pauses the ALSA device and the callback loop and drains all the existing data
+ * @brief Sends out a message to stop the transfer loop
  *
  * @param device
  * @return sa_result
@@ -95,7 +95,7 @@ sa_result stop_alsa_device(sa_device *device);
 sa_result drain_alsa_device(sa_device *device);
 
 /**
- * @brief Initializes the polling filedescriptors for alsa and a pipe for canceling playback
+ * @brief Initializes the polling filedescriptors for ALSA and a pipe for canceling playback
  *
  * @param device
  * @param poll_manager, nullpointer to initialize
@@ -110,6 +110,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
  *
  */
 void *init_playback_thread(void *data);
+
 /**
  * @brief Attempts to join the playback thread
  *
@@ -153,24 +154,25 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err);
  */
 sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
 /**
- * @brief messages a char to the playback thread via a pipe
+ * @brief Messages a char to the playback thread via a pipe
  *
  * @param device
  * @param toSend
  * @return sa_result
  */
 sa_result message_pipe(sa_device *device, char toSend);
+
 /**
- * @brief pauzes the callback loop
+ * @brief Pauses the callback loop, this function will pause the PCM handle by calling pause_PCM_handle(). After that it will block and wait for further commands from the message pipe.
  *
- * @param poll_managerµ
+ * @param poll_manager
  * @param handle
  * @return sa_result
  */
 sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device);
 
 /**
- * @brief Check whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
+ * @brief Checks whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
  * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_drain().
  *
  * @param device
@@ -179,7 +181,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 sa_result pause_PCM_handle(sa_device *device);
 
 /**
- * @brief Check whether the pcm was paused using snd_pcm_pause() or not and resume the pcm accordingly.
+ * @brief Checks whether the pcm was paused using snd_pcm_pause() or not and resume the pcm accordingly.
  *
  * @param device
  * @return sa_result
