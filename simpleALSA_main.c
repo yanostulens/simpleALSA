@@ -20,11 +20,9 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     *infile = infile_temp;
 }
 
-void callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device) {
-    int readcount   = 0;
+int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device) {
     SNDFILE *infile = (SNDFILE *) sa_device->myCustomData;
-    if(!(readcount = sf_readf_short(infile, sa_device->samples, sa_device->periodSize) > 0))
-    { printf("file end was reached\n"); }
+    return (sf_readf_short(infile, sa_device->samples, sa_device->periodSize) > 0);
 }
 
 int main(int argc, char const *argv[]) {
@@ -32,6 +30,7 @@ int main(int argc, char const *argv[]) {
     char *infilename = "./audioFiles/california.wav";
     SF_INFO sfinfo;
     SNDFILE *infile          = NULL;
+    
     sa_device_config *config = NULL;
     sa_device *device        = NULL;
     sa_init_device_config(&config);
@@ -54,7 +53,9 @@ int main(int argc, char const *argv[]) {
         } else if(strcmp(input, "pause\n") == 0)
         {
         } else if(strcmp(input, "stop\n") == 0)
-        {}
+        {
+        } else if(strcmp(input, "command\n") == 0)
+        { messagePipe(device, 's'); }
     }
 
     return 0;

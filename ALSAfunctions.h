@@ -144,5 +144,21 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err);
  * @return sa_result
  */
 sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
+/**
+ * @brief messages a char to the playback thread via a pipe
+ *
+ * @param device
+ * @param toSend
+ * @return sa_result
+ */
+sa_result messagePipe(sa_device *device, char toSend);
+
+/**
+ * @brief handles a command received in the pipe
+ *
+ * @param command
+ * @return sa_result
+ */
+sa_result handlePipeCommand(char command);
 
 #endif  // ALSAFUNCTIONS_H_

@@ -209,7 +209,8 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
         printf("Cannot create poll_pipe\n");
         return SA_ERROR;
     }
-
+    // TODO maybe remove me
+    // Makes read end nonblocking
     if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
     {
         printf("Failed to make pipe non-blocking\n");
@@ -251,6 +252,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
 void *initPlaybackThread(void *data) {
     sa_thread_data *thread_data = (sa_thread_data *) data;
     write_and_poll_loop(thread_data->device, thread_data->poll_manager);
+    printf("Playback has ended, can join the thread\n");
     return NULL;
 }
 
@@ -265,8 +267,7 @@ sa_result closePlaybackThread(sa_device *device) {
 
 sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     signed short *ptr;
-    int err, cptr, init;
-
+    int err, cptr, init, readcount;
     init = 1;
     while(1)
     {
@@ -296,8 +297,9 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device) =
           (int (*)(int, void *, sa_device *)) device->config->callbackFunction;
 
-        callbackFunction(device->periodSize, device->samples, device);
-
+        readcount = callbackFunction(device->periodSize, device->samples, device);
+        if(!readcount)
+        { break; }
         ptr  = device->samples;
         cptr = device->periodSize;
         while(cptr > 0)
@@ -359,13 +361,12 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
 
         if(poll_manager->ufds[0].revents & POLLIN)
         {
-            int status;
-            if((read(poll_manager->ufds[0].fd, &status, 1) == 1) && (status == 1))
+            char command;
+            if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
             {
-                // end has signaled
-                printf("Polling has been ended prematurely by pipe\n");
-                return -1;
-            }
+                printf("Pipe read error\n");
+            } else
+            { handlePipeCommand(command); }
         }
 
         snd_pcm_poll_descriptors_revents(handle, poll_manager->ufds + 1, poll_manager->count - 1, &revents);
@@ -375,6 +376,22 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
             return 0;
     }
     return -1;
+}
+
+sa_result handlePipeCommand(char command) {
+    switch(command)
+    {
+    // skip
+    case 's':
+        printf("Pipe requests skip\n");
+        break;
+    // TODO ADD COMMAND HANDELERS
+    default:
+        printf("Invalid command send to pipe\n");
+        return SA_ERROR;
+        break;
+    }
+    return SA_SUCCESS;
 }
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
@@ -432,4 +449,14 @@ sa_result drain_alsa_device(sa_device *device) {
         }
     }
     return SA_ERROR;
+}
+
+sa_result messagePipe(sa_device *device, char toSend) {
+    int result = write(device->pipe_write_end, &toSend, 1);
+    if(result != 1)
+    {
+        printf("Pipe write error\n");
+        return SA_ERROR;
+    }
+    return SA_SUCCESS;
 }
