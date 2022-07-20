@@ -134,7 +134,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
  * @param poll_manager
  * @return int
  */
-int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager);
+int wait_for_poll(sa_device* device, sa_poll_management *poll_manager);
 
 /**
  * @brief Try to recover from errors during playback
@@ -167,7 +167,7 @@ sa_result messagePipe(sa_device *device, char toSend);
  * @param handle
  * @return sa_result
  */
-sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, snd_pcm_t *handle);
+sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, sa_device* device);
 
 /**
  * @brief Prepares the ALSA device so it is ready for a restart

@@ -251,7 +251,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
 
 void *initPlaybackThread(void *data) {
     sa_thread_data *thread_data = (sa_thread_data *) data;
-    sa_result x                 = write_and_poll_loop(thread_data->device, thread_data->poll_manager);
+    write_and_poll_loop(thread_data->device, thread_data->poll_manager);
     printf("Playback has ended, can join the thread\n");
     return NULL;
 }
@@ -273,7 +273,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
     {
         if(!init)
         {
-            err = wait_for_poll(device->handle, poll_manager);
+            err = wait_for_poll(device, poll_manager);
             if(err < 0)
             {
                 if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
@@ -324,7 +324,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                 break;
             /* it is possible, that the initial buffer cannot store */
             /* all data from the last period, so wait awhile */
-            err = wait_for_poll(device->handle, poll_manager);
+            err = wait_for_poll(device, poll_manager);
             if(err < 0)
             {
                 if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
@@ -353,7 +353,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
  *   Transfer method - write and wait for room in buffer using poll
  */
 
-int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
+int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
     unsigned short revents;
     char command;
     while(1)
@@ -376,7 +376,7 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
                     return SA_CANCEL;
                     break;
                 case 'p':
-                    if(pauzeCallbackLoop(poll_manager, handle) == SA_CANCEL)
+                    if(pauzeCallbackLoop(poll_manager, device) == SA_CANCEL)
                     { return SA_CANCEL; }
                     break;
                 default:
@@ -386,7 +386,7 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
             }
         } else
         {
-            snd_pcm_poll_descriptors_revents(handle, poll_manager->ufds + 1, poll_manager->count - 1,
+            snd_pcm_poll_descriptors_revents(device->handle, poll_manager->ufds + 1, poll_manager->count - 1,
                                              &revents);
             if(revents & POLLERR)
                 return -EIO;
@@ -398,7 +398,10 @@ int wait_for_poll(snd_pcm_t *handle, sa_poll_management *poll_manager) {
     return -1;
 }
 
-sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, snd_pcm_t *handle) {
+sa_result pauzeCallbackLoop(sa_poll_management *poll_manager, sa_device *device) {
+    drain_alsa_device(device);
+    prepare_alsa_device(device);
+
     int pauzed = 1;
     char command;
     while(pauzed)
@@ -460,7 +463,6 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
 }
 
 sa_result pause_alsa_device(sa_device *device) {
-    drain_alsa_device(device);
     if(messagePipe(device, 'p') == SA_ERROR)
     {
         printf("Could not pauze playback\n");
@@ -504,7 +506,19 @@ sa_result drain_alsa_device(sa_device *device) {
             return SA_SUCCESS;
         }
     }
+    printf("Failed to drain ALSA device");
     return SA_ERROR;
+}
+
+sa_result prepare_alsa_device(sa_device *device) {
+    if(snd_pcm_prepare(device->handle) == 0)
+    {
+        return SA_SUCCESS;
+    } else
+    {
+        printf("Failed to prepare the ALSA device");
+        return SA_ERROR;
+    }
 }
 
 sa_result messagePipe(sa_device *device, char toSend) {
