@@ -195,7 +195,7 @@ sa_result start_alsa_device(sa_device *device) {
     if(pthread_create(&device->playbackThread, NULL, &initPlaybackThread, (void *) thread_data) != 0)
     {
         printf("Couldnt create playback thread\n");
-        return 0;
+        return SA_ERROR;
     }
     return SA_SUCCESS;
 }
@@ -248,16 +248,26 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     return SA_SUCCESS;
 }
 
-sa_result initPlaybackThread(void *data) {
+void *initPlaybackThread(void *data) {
     sa_thread_data *thread_data = (sa_thread_data *) data;
     write_and_poll_loop(thread_data->device, thread_data->poll_manager);
+    return NULL;
 }
 
-int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
+sa_result closePlaybackThread(sa_device *device) {
+    if(pthread_join(device->playbackThread, NULL) != 0)
+    {
+        printf("Could not join playback thread\n");
+        return SA_ERROR;
+    }
+    return SA_SUCCESS;
+}
+
+sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     signed short *ptr;
     int err, cptr, init;
 
-    init          = 1;
+    init = 1;
     while(1)
     {
         if(!init)
@@ -272,13 +282,13 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
                         printf("Write error: %s\n", snd_strerror(err));
-                        exit(EXIT_FAILURE);
+                        return SA_ERROR;
                     }
                     init = 1;
                 } else
                 {
                     printf("Wait for poll failed\n");
-                    return err;
+                    return SA_ERROR;
                 }
             }
         }
@@ -298,7 +308,7 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                 if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                 {
                     printf("Write error: %s\n", snd_strerror(err));
-                    exit(EXIT_FAILURE);
+                    return SA_ERROR;
                 }
                 init = 1;
                 break; /* skip one period */
@@ -321,18 +331,18 @@ int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
                         printf("Write error: %s\n", snd_strerror(err));
-                        exit(EXIT_FAILURE);
+                        return SA_ERROR;
                     }
                     init = 1;
                 } else
                 {
                     printf("Wait for poll failed\n");
-                    return err;
+                    return SA_ERROR;
                 }
             }
         }
     }
-    return 1;
+    return SA_SUCCESS;
 }
 
 /*

@@ -99,18 +99,25 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
  * @brief Starts the audio playback thread by running the write and poll loop
  *
  * @param data: a sa_thread_data packet
+ *
+ */
+void *initPlaybackThread(void *data);
+/**
+ * @brief Attempts to join the playback thread
+ *
+ * @param device
  * @return sa_result
  */
-sa_result initPlaybackThread(void *data);
+sa_result closePlaybackThread(sa_device *device);
 
 /**
  * @brief Plays audio by repeatedly calling the callback function for framas
  *
  * @param device
  * @param poll_manager
- * @return int
+ * @return sa_result
  */
-int write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager);
+sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager);
 
 /**
  * @brief Waits on poll and checks pipe

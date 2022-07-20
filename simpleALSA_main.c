@@ -28,7 +28,8 @@ void callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/afraid.wav";
+    // char *infilename = "./audioFiles/big_dogs.wav";
+    char *infilename = "./audioFiles/california.wav";
     SF_INFO sfinfo;
     SNDFILE *infile          = NULL;
     sa_device_config *config = NULL;
@@ -40,7 +41,6 @@ int main(int argc, char const *argv[]) {
     config->sampleRate       = sfinfo.samplerate;
     sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
-
     while(1)
     {
         printf("Give a command please...\n");
