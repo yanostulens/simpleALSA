@@ -2,19 +2,16 @@
 #include <stdio.h>
 
 #include "ALSAfunctions.h"
+#include "logger.h"
 #include "simpleALSA.h"
 
 void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     SNDFILE *infile_temp = sf_open(infilename, SFM_READ, sfinfo);
     if(!infile)
     {
-        fprintf(stderr, "Failed to open wav file");
+        printf("Failed to open wav file");
         exit(1);
     }
-    fprintf(stderr, "Channels: %d\n", sfinfo->channels);
-    fprintf(stderr, "Sample rate: %d\n", sfinfo->samplerate);
-    fprintf(stderr, "Sections: %d\n", sfinfo->sections);
-    fprintf(stderr, "Format: %d\n", sfinfo->format);
     *infile = infile_temp;
 }
 
@@ -24,7 +21,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device)
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "/home/daan/Thesis/alsa/simpleALSA/audioFiles/california.wav";
+    char *infilename = ".audioFiles/california.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -41,7 +38,7 @@ int main(int argc, char const *argv[]) {
     device->myCustomData = (void *) infile;
     while(1)
     {
-        printf("Give a command please...\n");
+        SA_LOG(DEBUG, "Give a command please...");
         char input[20];
         fgets(input, 20, stdin);
 
@@ -51,9 +48,6 @@ int main(int argc, char const *argv[]) {
         } else if(strcmp(input, "pause\n") == 0)
         {
             sa_pause_device(device);
-        } else if(strcmp(input, "unpause\n") == 0)
-        {
-            sa_start_device(device);
         } else if(strcmp(input, "stop\n") == 0)
         {
             sa_stop_device(device);

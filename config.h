@@ -1,6 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#include <alsa/asoundlib.h>
 #include <stdbool.h>
 
 /** ENUMS **/
@@ -16,18 +17,6 @@ typedef enum sa_result
     SA_CANCEL  = 1,
 
 } sa_result;
-
-/**
- * @brief enum to identify different types of logs
- *
- */
-typedef enum
-{
-    MESSAGE = 0,
-    DEBUG   = 1,
-    WARNING = 2,
-    ERROR   = 3
-} sa_log_type;
 
 /** STRUCTS **/
 typedef struct sa_device sa_device;
