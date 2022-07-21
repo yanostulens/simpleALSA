@@ -28,7 +28,7 @@ run:
 	./builds/alsaPlayer2.bin
 
 valgrind:
-	valgrind --leak-check=yes --show-leak-kinds=all --error-exitcode=1 --suppressions=./valgrind.supp ./builds/alsaPlayer2.bin
+	valgrind --leak-check=yes --show-leak-kinds=definite,indirect,possible --error-exitcode=1 --suppressions=./valgrind.supp ./builds/alsaPlayer2.bin
 
 
 debug: $(FILES)

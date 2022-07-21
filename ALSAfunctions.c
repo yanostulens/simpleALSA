@@ -15,8 +15,6 @@ sa_result init_alsa_device(sa_device *device) {
         exit(EXIT_FAILURE);
     }
 
-    snd_config_update_free_global();
-
     if((err = set_hardware_parameters(device, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
     {
         SA_LOG(ERROR, "ALSA: setting hardware parameters failed:", snd_strerror(err));
@@ -269,6 +267,7 @@ void *init_playback_thread(void *data) {
             }
         }
     }
+    close(pipe_read_end_fd->fd);
     free(pipe_read_end_fd);
     return NULL;
 }
@@ -613,6 +612,8 @@ sa_result message_pipe(sa_device *device, char toSend) {
 sa_result cleanup_device(sa_device *device) {
     if(device)
     {
+        close(device->pipe_write_end);
+
         if(device->config)
         { free(device->config); }
 
@@ -625,6 +626,7 @@ sa_result cleanup_device(sa_device *device) {
             { SA_LOG(ERROR, "Could not close handle : ", snd_strerror(err)); }
         }
         free(device);
+        snd_config_update_free_global();
     }
     return SA_SUCCESS;
 }
