@@ -38,7 +38,7 @@ int main(int argc, char const *argv[]) {
     device->myCustomData = (void *) infile;
     while(1)
     {
-        SA_LOG(DEBUG, "Give a command please...\n");
+        SA_LOG(DEBUG, "Give a command please...");
         char input[20];
         fgets(input, 20, stdin);
 
