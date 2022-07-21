@@ -259,7 +259,7 @@ void *init_playback_thread(void *data) {
                 case 'd':
                     break;
                 default:
-                    SA_LOG(ERROR, "Invalid command send to the pipe");
+                    SA_LOG(WARNING, "Invalid command send to the pipe");
                     continue;
                 }
                 SA_LOG(DEBUG, "Attempting to destroy the device");
@@ -273,14 +273,14 @@ void *init_playback_thread(void *data) {
 
 sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd) {
     sa_poll_management *poll_manager = NULL;
-    // Init poll manager
+    /** Init the poll manager */
     if(init_poll_management(device, &poll_manager, pipe_read_end_fd) != SA_SUCCESS)
     {
-        printf("Could not allocate poll descriptors and pipe\n");
+        SA_LOG(ERROR, "Could not initialize the poll manager");
         return SA_ERROR;
     }
     write_and_poll_loop(device, poll_manager);
-    // Cleanup
+    /** Cleanup */
     free(poll_manager->ufds);
     free(poll_manager);
     poll_manager = NULL;
@@ -293,27 +293,27 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     int err;
 
     poll_manager_temp->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
-    // there must be at least one alsa descriptor
+    /** There must be at least one alsa descriptor */
     if(poll_manager_temp->count <= 1)
     {
-        printf("Invalid poll descriptors count\n");
-        return poll_manager_temp->count;
+        SA_LOG(ERROR, "Invalid poll descriptor count");
+        return SA_ERROR;
     }
 
     poll_manager_temp->ufds = malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
     if(poll_manager_temp->ufds == NULL)
     {
-        printf("No enough memory\n");
+        SA_LOG(ERROR, "Not enough memory to allocate ufds");
         return SA_ERROR;
     }
-    // store read end of pipe in the array
+    /** Store read end of pipe in the array */
     poll_manager_temp->ufds[0] = *pipe_read_end_fd;
 
-    // dont give ALSA the first poll descriptor
+    /** Don't give ALSA the first poll descriptor */
     if((err = snd_pcm_poll_descriptors(device->handle, poll_manager_temp->ufds + 1,
                                        poll_manager_temp->count - 1)) < 0)
     {
-        printf("Unable to obtain poll descriptors for playback: %s\n", snd_strerror(err));
+        SA_LOG("Unable to obtain poll descriptors for playback", snd_strerror(err));
         return SA_ERROR;
     }
     *poll_manager = poll_manager_temp;
@@ -323,7 +323,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
 sa_result close_playback_thread(sa_device *device) {
     if(pthread_join(device->playbackThread, NULL) != 0)
     {
-        printf("Could not join playback thread\n");
+        SA_LOG(ERROR, "Could not join playback thread");
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -346,25 +346,26 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
-                        printf("Write error: %s\n", snd_strerror(err));
+                        SA_LOG(ERROR, "Write error:", snd_strerror(err));
                         return SA_ERROR;
                     }
                     init = 1;
                 } else
                 {
-                    printf("Wait for poll failed\n");
+                    SA_LOG(ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
             } else if(err == SA_CANCEL)
             { return SA_CANCEL; }
         }
-        // CALL CALLBACK HERE to fill samples !!
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device) =
           (int (*)(int, void *, sa_device *)) device->config->callbackFunction;
-
         readcount = callbackFunction(device->periodSize, device->samples, device);
+
+        /** If the callback has not written any frames - there are no frames left so we stop the callback loop */
         if(!readcount)
         { break; }
+
         ptr  = device->samples;
         cptr = device->periodSize;
         while(cptr > 0)
@@ -374,11 +375,11 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             {
                 if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                 {
-                    printf("Write error: %s\n", snd_strerror(err));
+                    SA_LOG(ERROR, "Write error:", snd_strerror(err));
                     return SA_ERROR;
                 }
                 init = 1;
-                break; /* skip one period */
+                break;
             }
             if(snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING)
                 init = 0;
@@ -386,8 +387,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             cptr -= err;
             if(cptr == 0)
                 break;
-            /* it is possible, that the initial buffer cannot store */
-            /* all data from the last period, so wait awhile */
+            /* It is possible, that the initial buffer cannot store all data from the last period, so wait a while */
             err = wait_for_poll(device, poll_manager);
             if(err < 0)
             {
@@ -397,13 +397,13 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
-                        printf("Write error: %s\n", snd_strerror(err));
+                        SA_LOG(ERROR, "Write error:", snd_strerror(err));
                         return SA_ERROR;
                     }
                     init = 1;
                 } else
                 {
-                    printf("Wait for poll failed\n");
+                    SA_LOG(ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
             } else if(err == SA_CANCEL)
@@ -425,7 +425,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
         {
             if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
             {
-                printf("Pipe read error\n");
+                SA_LOG(ERROR, "Pipe read error");
             } else
             {
                 switch(command)
@@ -442,7 +442,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                     { return SA_CANCEL; }
                     break;
                 default:
-                    printf("Invalid command send to pipe\n");
+                    SA_LOG(WARNING, "Invalid command send to pipe");
                     break;
                 }
             }
@@ -456,7 +456,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 return SA_SUCCESS;
         }
     }
-    printf("Poll loop ended without proper return\n");
+    SA_LOG(ERROR, "Poll loop ended without proper return");
     return -1;
 }
 
@@ -470,7 +470,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
         poll(&(poll_manager->ufds[0]), 1, -1);
         if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
         {
-            printf("Pipe read error\n");
+            SA_LOG(ERROR, "Pipe read error");
         } else
         {
             switch(command)
@@ -496,18 +496,18 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
     if(err == -EPIPE)
-    { /* under-run */
+    { /* Underrun */
         err = snd_pcm_prepare(handle);
         if(err < 0)
         {
-            printf("Can't recover from underrun, prepare failed: %s\n", snd_strerror(err));
+            SA_LOG(ERROR, "Can't recover from underrun, prepare failed:", snd_strerror(err));
             return SA_ERROR;
         }
     } else if(err == -ESTRPIPE)
     {
         while((err = snd_pcm_resume(handle)) == -EAGAIN)
         {
-            /* wait until the suspend flag is released */
+            /* Wait until the suspend flag is released */
             sleep(1);
         }
         if(err < 0)
@@ -515,7 +515,7 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
             err = snd_pcm_prepare(handle);
             if(err < 0)
             {
-                printf("Can't recovery from suspend, prepare failed: %s\n", snd_strerror(err));
+                SA_LOG(ERROR, "Can't recover from suspend, prepare failed:", snd_strerror(err));
                 return SA_ERROR;
             }
         }
@@ -527,7 +527,7 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
 sa_result pause_alsa_device(sa_device *device) {
     if(message_pipe(device, 'p') == SA_ERROR)
     {
-        printf("Could not pauze playback\n");
+        SA_LOG(ERROR, "Could not send pause command to the message pipe");
         return SA_ERROR;
     };
     return SA_SUCCESS;
@@ -536,7 +536,7 @@ sa_result pause_alsa_device(sa_device *device) {
 sa_result unpause_alsa_device(sa_device *device) {
     if(message_pipe(device, 'u') == SA_ERROR)
     {
-        printf("Could not unpauze playback\n");
+        SA_LOG(ERROR, "Could not send unpause command to the message pipe");
         return SA_ERROR;
     };
     return SA_SUCCESS;
@@ -545,7 +545,7 @@ sa_result unpause_alsa_device(sa_device *device) {
 sa_result stop_alsa_device(sa_device *device) {
     if(message_pipe(device, 's') == SA_ERROR)
     {
-        printf("Could not cancel playback\n");
+        SA_LOG(ERROR, "Could not send cancel command to the message pipe");
         return SA_ERROR;
     };
     return SA_SUCCESS;
@@ -553,19 +553,16 @@ sa_result stop_alsa_device(sa_device *device) {
 }
 
 sa_result pause_PCM_handle(sa_device *device) {
-    printf("Entered the pausePCMHandle function\n");
     if(device->supportsPause)
     {
         if(snd_pcm_pause(device->handle, 1) != 0)
         {
-            printf("Failed to snd_pcm_pause() the pcm handle\n");
+            SA_LOG(ERROR, "Failed to snd_pcm_pause the pcm handle (when pausing)");
             return SA_ERROR;
         }
-        printf("Device pause with snd_pcm_pause()\n");
         return SA_SUCCESS;
     } else
     {
-        printf("Device paused alternatively\n");
         if(drain_alsa_device(device) == SA_SUCCESS && prepare_alsa_device(device) == SA_SUCCESS)
             return SA_SUCCESS;
     }
@@ -575,10 +572,9 @@ sa_result pause_PCM_handle(sa_device *device) {
 sa_result unpause_PCM_handle(sa_device *device) {
     if(device->supportsPause)
     {
-        printf("Resuming with snd_pcm_pause()\n");
         if(snd_pcm_pause(device->handle, 0) != 0)
         {
-            printf("Failed to resume the paused pcm handle\n");
+            SA_LOG(ERROR, "Failed to snd_pcm_pause the pcm handle (when resuming)");
             return SA_ERROR;
         }
     }
