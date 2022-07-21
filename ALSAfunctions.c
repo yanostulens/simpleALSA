@@ -2,6 +2,8 @@
 
 #include "ALSAfunctions.h"
 
+#include "logger.h"
+
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));
@@ -9,18 +11,18 @@ sa_result init_alsa_device(sa_device *device) {
 
     if((err = snd_pcm_open(&(device->handle), device->config->device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
     {
-        printf("Playback open error: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: playback open error:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
 
     if((err = set_hardware_parameters(device, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
     {
-        printf("Setting of hwparams failed: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: setting hardware parameters failed:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
     if((err = set_software_parameters(device)) < 0)
     {
-        printf("Setting of swparams failed: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: setting software parameters failed:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
 
@@ -34,9 +36,9 @@ sa_result init_alsa_device(sa_device *device) {
     device->supportsPause = snd_pcm_hw_params_can_pause(device->hwparams);
     if(device->supportsPause)
     {
-        printf("Device supports snd_pcm_pause()\n");
+        SA_LOG(DEBUG, "Device supports snd_pcm_pause()");
     } else
-    { printf("Device does not support snd_pcm_pause()\n"); }
+    { SA_LOG(DEBUG, "Device does not support snd_pcm_pause()"); }
 
     return SA_SUCCESS;
 }
@@ -46,93 +48,89 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     snd_pcm_uframes_t size;
     int err, dir;
 
-    /* choose all parameters */
     err = snd_pcm_hw_params_any(device->handle, device->hwparams);
     if(err < 0)
     {
-        printf("Broken configuration for playback: no configurations available: %s\n", snd_strerror(err));
+        SA_LOG(ERROR,
+               "ALSA: broken configuration for playback: no configurations available:", snd_strerror(err));
         return SA_ERROR;
     }
-    /* set hardware resampling */
+    /** Set the samplerate */
     err = snd_pcm_hw_params_set_rate_resample(device->handle, device->hwparams, 1);
     if(err < 0)
     {
-        printf("Resampling setup failed for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: resampling setup failed for playback:", snd_strerror(err));
         return SA_ERROR;
     }
-    /* set the interleaved read/write format */
+    /* Set the interleaved read/write format */
     err = snd_pcm_hw_params_set_access(device->handle, device->hwparams, access);
     if(err < 0)
     {
-        printf("Access type not available for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: access type not available for playback", snd_strerror(err));
         return SA_ERROR;
     }
-    /* set the sample format */
+    /* Set the sample format */
     err = snd_pcm_hw_params_set_format(device->handle, device->hwparams, device->config->format);
     if(err < 0)
     {
-        printf("Sample format not available for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: sample format not available for playback:", snd_strerror(err));
         return SA_ERROR;
     }
-    /* set the count of channels */
+    /* Set the count of channels */
     err = snd_pcm_hw_params_set_channels(device->handle, device->hwparams, device->config->channels);
     if(err < 0)
     {
-        printf("Channels count (%u) not available for playbacks: %s\n", device->config->channels,
-               snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: channels count not available for playback", snd_strerror(err));
         return SA_ERROR;
     }
-    /* set the stream rate */
+    /* Set the stream rate */
     rrate = device->config->sampleRate;
     err   = snd_pcm_hw_params_set_rate_near(device->handle, device->hwparams, &rrate, 0);
     if(err < 0)
     {
-        printf("Rate %uHz not available for playback: %s\n", device->config->sampleRate, snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: samplerate not available for playback", snd_strerror(err));
         return SA_ERROR;
     }
     if(rrate != device->config->sampleRate)
     {
-        printf("Rate doesn't match (requested %uHz, get %iHz)\n", device->config->sampleRate, err);
-        // return -EINVAL;
+        SA_LOG(ERROR, "ALSA: sample rate does not match the requested rate");
         return SA_ERROR;
     }
-    /* set the buffer time */
+    /* Set the buffer time */
     err = snd_pcm_hw_params_set_buffer_time_near(device->handle, device->hwparams,
                                                  (unsigned int *) &(device->config->bufferTime), &dir);
     if(err < 0)
     {
-        printf("Unable to set buffer time %u for playback: %s\n", device->config->bufferTime,
-               snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to set the buffer time for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     err = snd_pcm_hw_params_get_buffer_size(device->hwparams, &size);
     if(err < 0)
     {
-        printf("Unable to get buffer size for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to get the buffer size for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     device->bufferSize = size;
-    /* set the period time */
+    /* Set the period time */
     err                = snd_pcm_hw_params_set_period_time_near(device->handle, device->hwparams,
                                                  (unsigned int *) &(device->config->periodTime), &dir);
     if(err < 0)
     {
-        printf("Unable to set period time %u for playback: %s\n", device->config->periodTime,
-               snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     err = snd_pcm_hw_params_get_period_size(device->hwparams, &size, &dir);
     if(err < 0)
     {
-        printf("Unable to get period size for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to get period size for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     device->periodSize = size;
-    /* write the parameters to device */
+    /* Write the parameters to device */
     err                = snd_pcm_hw_params(device->handle, device->hwparams);
     if(err < 0)
     {
-        printf("Unable to set hw params for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to set hardware parameters for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -141,46 +139,46 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
 sa_result set_software_parameters(sa_device *device) {
     int err;
 
-    /* get the current swparams */
+    /* Get the current swparams */
     err = snd_pcm_sw_params_current(device->handle, device->swparams);
     if(err < 0)
     {
-        printf("Unable to determine current swparams for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR,
+               "ALSA: unable to determine current software parameters for playback:", snd_strerror(err));
         return SA_ERROR;
     }
-    /* start the transfer when the buffer is almost full: */
-    /* (buffer_size / avail_min) * avail_min */
+    /* Start the transfer when the buffer is almost full: (buffer_size / avail_min) * avail_min */
     err = snd_pcm_sw_params_set_start_threshold(
       device->handle, device->swparams, (device->bufferSize / device->periodSize) * device->periodSize);
     if(err < 0)
     {
-        printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to start set threshold mode for playback", snd_strerror(err));
         return SA_ERROR;
     }
-    /* allow the transfer when at least period_size samples can be processed */
+    /* Allow the transfer when at least period_size samples can be processed */
     /* or disable this mechanism when period event is enabled (aka interrupt like style processing) */
     err = snd_pcm_sw_params_set_avail_min(device->handle, device->swparams,
                                           0 ? device->bufferSize : device->periodSize);
     if(err < 0)
     {
-        printf("Unable to set avail min for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to set available minimum for playback", snd_strerror(err));
         return SA_ERROR;
     }
-    /* enable period events when requested */
+    /* Enable period events when requested */
     if(0)
     {
         err = snd_pcm_sw_params_set_period_event(device->handle, device->swparams, 1);
         if(err < 0)
         {
-            printf("Unable to set period event: %s\n", snd_strerror(err));
+            SA_LOG(ERROR, "ALSA: unable to set period event", snd_strerror(err));
             return SA_ERROR;
         }
     }
-    /* write the parameters to the playback device */
+    /* Write the parameters to the playback device */
     err = snd_pcm_sw_params(device->handle, device->swparams);
     if(err < 0)
     {
-        printf("Unable to set sw params for playback: %s\n", snd_strerror(err));
+        SA_LOG(ERROR, "ALSA: unable to set software parameters for playback", snd_strerror(err));
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -196,7 +194,7 @@ sa_result start_alsa_device(sa_device *device) {
         sa_poll_management *poll_manager = NULL;
         if(init_poll_management(device, &poll_manager) != SA_SUCCESS)
         {
-            printf("Could not allocate poll descriptors and pipe\n");
+            SA_LOG(ERROR, "Could not initialize the poll management");
             return SA_ERROR;
         }
 
@@ -206,7 +204,7 @@ sa_result start_alsa_device(sa_device *device) {
         // NULL for default thread attributes
         if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
         {
-            printf("Couldnt create playback thread\n");
+            SA_LOG(ERROR, "Could not create a playback thread");
             return SA_ERROR;
         }
         return SA_SUCCESS;
@@ -215,11 +213,11 @@ sa_result start_alsa_device(sa_device *device) {
 
 sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager) {
     sa_poll_management *poll_manager_temp = (sa_poll_management *) malloc(sizeof(sa_poll_management));
-    int pipe_fds[2];  // store me somewhere (later)
+    int pipe_fds[2];
     int err;
     if(pipe(pipe_fds))
     {
-        printf("Cannot create poll_pipe\n");
+        SA_LOG(ERROR, "Cannot create poll pipe");
         return SA_ERROR;
     }
     // TODO maybe remove me
