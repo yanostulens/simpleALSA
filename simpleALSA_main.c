@@ -52,7 +52,12 @@ int main(int argc, char const *argv[]) {
         {
             sa_stop_device(device);
             sf_seek(infile, 0, SEEK_SET);
+        } else if(strcmp(input, "destroy\n") == 0)
+        {
+            sa_destroy_device(device);
+            break;
         }
     }
+    sf_close(infile);
     return 0;
 }

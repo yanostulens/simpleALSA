@@ -27,6 +27,10 @@ test_poll: ./main_with_polldescr.c
 run:
 	./builds/alsaPlayer2.bin
 
+valgrind:
+	valgrind --leak-check=yes --show-leak-kinds=all --error-exitcode=1 ./builds/alsaPlayer2.bin
+
+
 debug: $(FILES)
 	mkdir -p builds
 	mkdir -p builds
