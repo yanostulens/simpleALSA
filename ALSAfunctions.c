@@ -74,6 +74,7 @@ sa_result prepare_playback_thread(sa_device *device) {
         printf("Couldnt create playback thread\n");
         return SA_ERROR;
     }
+    return SA_SUCCESS;
 }
 
 sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
@@ -278,6 +279,7 @@ sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_
     free(poll_manager->ufds);
     free(poll_manager);
     poll_manager = NULL;
+    return SA_SUCCESS;
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
@@ -582,23 +584,23 @@ sa_result drain_alsa_device(sa_device *device) {
     if(device->handle && snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING &&
        snd_pcm_drop(device->handle) == 0)
     { return SA_SUCCESS; }
-    printf("Failed to drain ALSA device");
-    return SA_ERROR;
+    SA_LOG(ERROR, "Failed to drop the ALSA device");
+    exit(EXIT_FAILURE);
 }
 
 sa_result prepare_alsa_device(sa_device *device) {
     if(device->handle && snd_pcm_prepare(device->handle) == 0)
     { return SA_SUCCESS; }
-    printf("Failed to prepare the ALSA device");
-    return SA_ERROR;
+    SA_LOG(ERROR, "Failed to prepare the ALSA device");
+    exit(EXIT_FAILURE);
 }
 
 sa_result message_pipe(sa_device *device, char toSend) {
     int result = write(device->pipe_write_end, &toSend, 1);
     if(result != 1)
     {
-        printf("Pipe write error\n");
-        return SA_ERROR;
+        SA_LOG(ERROR, "Failed to write to the pipe");
+        exit(EXIT_FAILURE);
     }
     return SA_SUCCESS;
 }
@@ -613,4 +615,5 @@ sa_result cleanup(sa_device *device, sa_poll_management *poll_manager) {
             free(device->config);
         }
     }
+    return SA_SUCCESS;
 }
