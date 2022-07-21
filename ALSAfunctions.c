@@ -40,39 +40,10 @@ sa_result init_alsa_device(sa_device *device) {
     } else
     { SA_LOG(DEBUG, "Device does not support snd_pcm_pause()"); }
 
-    return prepare_playback_thread(device);
-}
-
-sa_result prepare_playback_thread(sa_device *device) {
-    // prepare communication pipe
-    int pipe_fds[2];
-    if(pipe(pipe_fds))
+    if(prepare_playback_thread(device) != SA_SUCCESS)
     {
-        printf("Cannot create poll_pipe\n");
-        return SA_ERROR;
-    }
-    // Makes read end nonblocking
-    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
-    {
-        printf("Failed to make pipe non-blocking\n");
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        return SA_ERROR;
-    }
-    // store the write end
-    device->pipe_write_end          = pipe_fds[1];
-    // prepare read polling structure of the read end
-    struct pollfd *pipe_read_end_fd = malloc(sizeof(struct pollfd));
-    pipe_read_end_fd->fd            = pipe_fds[0];
-    pipe_read_end_fd->events        = POLLIN;
-    // startup the playback thread
-    sa_thread_data *thread_data     = malloc(sizeof(sa_thread_data));
-    thread_data->device             = device;
-    thread_data->pipe_read_end_fd   = pipe_read_end_fd;
-    if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
-    {
-        printf("Couldnt create playback thread\n");
-        return SA_ERROR;
+        SA_LOG(ERROR, "Failed to perpare the playback thread");
+        exit(EXIT_FAILURE);
     }
     return SA_SUCCESS;
 }
@@ -218,29 +189,63 @@ sa_result set_software_parameters(sa_device *device) {
     return SA_SUCCESS;
 }
 
+sa_result prepare_playback_thread(sa_device *device) {
+    /** Prepare communication pipe */
+    int pipe_fds[2];
+    if(pipe(pipe_fds))
+    {
+        SA_LOG(ERROR, "Cannot create poll_pipe");
+        return SA_ERROR;
+    }
+    /** Makes read end nonblocking */
+    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
+    {
+        SA_LOG(ERROR, "Failed to make pipe non-blocking");
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return SA_ERROR;
+    }
+    /** Store the write end */
+    device->pipe_write_end          = pipe_fds[1];
+    /** Prepare read polling structure of the read end */
+    struct pollfd *pipe_read_end_fd = malloc(sizeof(struct pollfd));
+    pipe_read_end_fd->fd            = pipe_fds[0];
+    pipe_read_end_fd->events        = POLLIN;
+    /** Startup the playback thread */
+    sa_thread_data *thread_data     = malloc(sizeof(sa_thread_data));
+    thread_data->device             = device;
+    thread_data->pipe_read_end_fd   = pipe_read_end_fd;
+    if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
+    {
+        SA_LOG(ERROR, "Failed to create the playback thread");
+        return SA_ERROR;
+    }
+    return SA_SUCCESS;
+}
+
 sa_result start_alsa_device(sa_device *device) {
     return unpause_alsa_device(device);
 }
 
 void *init_playback_thread(void *data) {
     char command;
-    // unwrap data packet
+    /** Unwrap the data packet */
     sa_thread_data *thread_data     = (sa_thread_data *) data;
     sa_device *device               = thread_data->device;
     struct pollfd *pipe_read_end_fd = thread_data->pipe_read_end_fd;
     free(thread_data);
 
-    // actual playback loop, lives and dies with the device
+    /** Actual playback loop, lives and dies with the device */
     while(1)
     {
-        // Poll on read end, wait for initial play command
+        /** Poll on read end, wait for initial play command */
         poll(pipe_read_end_fd, 1, -1);
 
         if(pipe_read_end_fd->revents & POLLIN)
         {
             if(read(pipe_read_end_fd->fd, &command, 1) != 1)
             {
-                printf("Pipe read error\n");
+                SA_LOG(ERROR, "Pipe read error");
             } else
             {
                 switch(command)
@@ -254,10 +259,10 @@ void *init_playback_thread(void *data) {
                 case 'd':
                     break;
                 default:
-                    printf("Invalid command send to pipe\n");
+                    SA_LOG(ERROR, "Invalid command send to the pipe");
                     continue;
                 }
-                printf("Attempting to destory device\n");
+                SA_LOG(DEBUG, "Attempting to destroy the device");
                 break;
             }
         }
