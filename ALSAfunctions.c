@@ -581,10 +581,12 @@ sa_result unpause_PCM_handle(sa_device *device) {
 }
 
 sa_result drain_alsa_device(sa_device *device) {
-    if(device->handle && snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING &&
+    if(device->handle &&
+       (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
+        snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED) &&
        snd_pcm_drop(device->handle) == 0)
     { return SA_SUCCESS; }
-    SA_LOG(ERROR, "Failed to drop the ALSA device");
+    SA_LOG(ERROR, "Failed to drop samples from the ALSA device");
     exit(EXIT_FAILURE);
 }
 
