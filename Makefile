@@ -6,7 +6,8 @@ OUT_PC := -o ./builds/alsaPlayer2.bin
 
 MAIN := ./simpleALSA_main.c
 EXAMPLE_MAIN:= ./main.c
-FILES := ./ALSAfunctions.c ./simpleALSA.c
+FILES := ./ALSAfunctions.c ./simpleALSA.c ./logger.c
+LOG_FLAGS := 
 
 pc: $(FILES)
 	mkdir -p builds
