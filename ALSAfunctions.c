@@ -38,7 +38,40 @@ sa_result init_alsa_device(sa_device *device) {
     } else
     { printf("Device does not support snd_pcm_pause()\n"); }
 
-    return SA_SUCCESS;
+    return prepare_playback_thread(device);
+}
+
+sa_result prepare_playback_thread(sa_device *device) {
+    // prepare communication pipe
+    int pipe_fds[2];
+    if(pipe(pipe_fds))
+    {
+        printf("Cannot create poll_pipe\n");
+        return SA_ERROR;
+    }
+    // Makes read end nonblocking
+    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
+    {
+        printf("Failed to make pipe non-blocking\n");
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return SA_ERROR;
+    }
+    // store the write end
+    device->pipe_write_end          = pipe_fds[1];
+    // prepare read polling structure of the read end
+    struct pollfd *pipe_read_end_fd = malloc(sizeof(struct pollfd));
+    pipe_read_end_fd->fd            = pipe_fds[0];
+    pipe_read_end_fd->events        = POLLIN;
+    // startup the playback thread
+    sa_thread_data *thread_data     = malloc(sizeof(sa_thread_data));
+    thread_data->device             = device;
+    thread_data->pipe_read_end_fd   = pipe_read_end_fd;
+    if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
+    {
+        printf("Couldnt create playback thread\n");
+        return SA_ERROR;
+    }
 }
 
 sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
@@ -187,50 +220,72 @@ sa_result set_software_parameters(sa_device *device) {
 }
 
 sa_result start_alsa_device(sa_device *device) {
-    if(snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED)
-    {
-        unpause_alsa_device(device);
-        return SA_SUCCESS;
-    } else
-    {
-        sa_poll_management *poll_manager = NULL;
-        if(init_poll_management(device, &poll_manager) != SA_SUCCESS)
-        {
-            printf("Could not allocate poll descriptors and pipe\n");
-            return SA_ERROR;
-        }
-
-        sa_thread_data *thread_data = (sa_thread_data *) malloc(sizeof(sa_thread_data));
-        thread_data->device         = device;
-        thread_data->poll_manager   = poll_manager;
-        // NULL for default thread attributes
-        if(pthread_create(&device->playbackThread, NULL, &init_playback_thread, (void *) thread_data) != 0)
-        {
-            printf("Couldnt create playback thread\n");
-            return SA_ERROR;
-        }
-        return SA_SUCCESS;
-    }
+    return unpause_alsa_device(device);
 }
 
-sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager) {
+void *init_playback_thread(void *data) {
+    char command;
+    // unwrap data packet
+    sa_thread_data *thread_data     = (sa_thread_data *) data;
+    sa_device *device               = thread_data->device;
+    struct pollfd *pipe_read_end_fd = thread_data->pipe_read_end_fd;
+    free(thread_data);
+
+    // actual playback loop, lives and dies with the device
+    while(1)
+    {
+        // Poll on read end, wait for initial play command
+        poll(pipe_read_end_fd, 1, -1);
+
+        if(pipe_read_end_fd->revents & POLLIN)
+        {
+            if(read(pipe_read_end_fd->fd, &command, 1) != 1)
+            {
+                printf("Pipe read error\n");
+            } else
+            {
+                switch(command)
+                {
+                /** Play command */
+                case 'u':
+                    if(start_write_and_poll_loop(device, pipe_read_end_fd) == SA_ERROR)
+                    { break; }
+                    continue;
+                /** Destroy command, no continue; break out of while */
+                case 'd':
+                    break;
+                default:
+                    printf("Invalid command send to pipe\n");
+                    continue;
+                }
+                printf("Attempting to destory device\n");
+                break;
+            }
+        }
+    }
+    // TODO DEVICE CLEANUP HERE
+    return NULL;
+}
+
+sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd) {
+    sa_poll_management *poll_manager = NULL;
+    // Init poll manager
+    if(init_poll_management(device, &poll_manager, pipe_read_end_fd) != SA_SUCCESS)
+    {
+        printf("Could not allocate poll descriptors and pipe\n");
+        return SA_ERROR;
+    }
+    write_and_poll_loop(device, poll_manager);
+    // Cleanup
+    free(poll_manager->ufds);
+    free(poll_manager);
+    poll_manager = NULL;
+}
+
+sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
+                               struct pollfd *pipe_read_end_fd) {
     sa_poll_management *poll_manager_temp = (sa_poll_management *) malloc(sizeof(sa_poll_management));
-    int pipe_fds[2];  // store me somewhere (later)
     int err;
-    if(pipe(pipe_fds))
-    {
-        printf("Cannot create poll_pipe\n");
-        return SA_ERROR;
-    }
-    // TODO maybe remove me
-    // Makes read end nonblocking
-    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
-    {
-        printf("Failed to make pipe non-blocking\n");
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        return SA_ERROR;
-    }
 
     poll_manager_temp->count = 1 + snd_pcm_poll_descriptors_count(device->handle);
     // there must be at least one alsa descriptor
@@ -246,11 +301,9 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
         printf("No enough memory\n");
         return SA_ERROR;
     }
-    // store read end of pipe
-    poll_manager_temp->ufds[0].fd     = pipe_fds[0];
-    poll_manager_temp->ufds[0].events = POLLIN;
-    // store the write end
-    device->pipe_write_end            = pipe_fds[1];
+    // store read end of pipe in the array
+    poll_manager_temp->ufds[0] = *pipe_read_end_fd;
+
     // dont give ALSA the first poll descriptor
     if((err = snd_pcm_poll_descriptors(device->handle, poll_manager_temp->ufds + 1,
                                        poll_manager_temp->count - 1)) < 0)
@@ -260,13 +313,6 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     }
     *poll_manager = poll_manager_temp;
     return SA_SUCCESS;
-}
-
-void *init_playback_thread(void *data) {
-    sa_thread_data *thread_data = (sa_thread_data *) data;
-    write_and_poll_loop(thread_data->device, thread_data->poll_manager);
-    printf("Playback has ended, can join the thread\n");
-    return NULL;
 }
 
 sa_result close_playback_thread(sa_device *device) {
@@ -557,4 +603,16 @@ sa_result message_pipe(sa_device *device, char toSend) {
         return SA_ERROR;
     }
     return SA_SUCCESS;
+}
+
+sa_result cleanup(sa_device *device, sa_poll_management *poll_manager) {
+    if(device)
+    {
+        if(device->config)
+        {
+            if(device->config->device)
+            { free(device->config->device); }
+            free(device->config);
+        }
+    }
 }

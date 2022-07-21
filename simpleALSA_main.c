@@ -24,7 +24,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device)
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/afraid.wav";
+    char *infilename = "/home/daan/Thesis/alsa/simpleALSA/audioFiles/california.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -53,13 +53,12 @@ int main(int argc, char const *argv[]) {
             sa_pause_device(device);
         } else if(strcmp(input, "unpause\n") == 0)
         {
-            sa_unpause_device(device);
+            sa_start_device(device);
         } else if(strcmp(input, "stop\n") == 0)
         {
             sa_stop_device(device);
             sf_seek(infile, 0, SEEK_SET);
         }
     }
-
     return 0;
 }

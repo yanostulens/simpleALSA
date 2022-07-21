@@ -1,6 +1,6 @@
 #ifndef SIMPLEASLA_H_
     #define SIMPLEALSA_H_
-    
+
     #include <alsa/asoundlib.h>
 
     #include "config.h"
@@ -38,7 +38,7 @@
  * @param device - empty pointer into which the config struct is set
  * @return sa_return_status
  */
-sa_result sa_init_device_config(sa_device_config ** config);
+sa_result sa_init_device_config(sa_device_config **config);
 
 /**
  * @brief initializes a new audio device
@@ -63,15 +63,6 @@ sa_result sa_start_device(sa_device *device);
  * @return sa_return_status
  */
 sa_result sa_pause_device(sa_device *device);
-
-
-/**
- * @brief unpauses the simple ALSA device - which pauses the callback loop
- *
- * @param device - device to unpause
- * @return sa_result
- */
-sa_result sa_unpause_device(sa_device *device);
 
 /**
  * @brief stops a simple ALSA device - same as pause but in addation, all buffer data is dropped

@@ -19,14 +19,14 @@ typedef struct
 } sa_poll_management;
 
 /**
- * @brief a data packet for starting the playback thread
+ * @brief a struct with data to be passed to the playback thread
  */
 typedef struct
 {
-    /** The device */
+    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
     sa_device *device;
-    /** The poll manager */
-    sa_poll_management *poll_manager;
+    /** The read end of the pipe */
+    struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
 /** FUNCTIONS */
@@ -54,6 +54,13 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access);
  */
 sa_result set_software_parameters(sa_device *device);
 
+/**
+ * @brief Prepares and starts the playback thread and creates a communication pipe
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result prepare_playback_thread(sa_device *device);
 /**
  * @brief Starts the ALSA write and wait loop
  *
@@ -95,13 +102,15 @@ sa_result stop_alsa_device(sa_device *device);
 sa_result drain_alsa_device(sa_device *device);
 
 /**
- * @brief Initializes the polling filedescriptors for ALSA and a pipe for canceling playback
+ * @brief Initializes the polling filedescriptors for ALSA and links it to the communication pipe
  *
  * @param device
  * @param poll_manager, nullpointer to initialize
+ * @param pipe_read_end_fd
  * @return sa_result
  */
-sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager);
+sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
+                               struct pollfd *pipe_read_end_fd);
 
 /**
  * @brief Starts the audio playback thread by running the write and poll loop
@@ -118,6 +127,14 @@ void *init_playback_thread(void *data);
  * @return sa_result
  */
 sa_result close_playback_thread(sa_device *device);
+/**
+ * @brief Prepares and starts write_and_poll_loop
+ *
+ * @param device
+ * @param pipe_read_end_fd
+ * @return sa_result
+ */
+sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd);
 
 /**
  * @brief Plays audio by repeatedly calling the callback function for framas
@@ -163,7 +180,8 @@ sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
 sa_result message_pipe(sa_device *device, char toSend);
 
 /**
- * @brief Pauses the callback loop, this function will pause the PCM handle by calling pause_PCM_handle(). After that it will block and wait for further commands from the message pipe.
+ * @brief Pauses the callback loop, this function will pause the PCM handle by calling pause_PCM_handle().
+ * After that it will block and wait for further commands from the message pipe.
  *
  * @param poll_manager
  * @param handle
