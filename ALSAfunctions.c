@@ -541,7 +541,7 @@ sa_result stop_alsa_device(sa_device *device) {
         printf("Could not cancel playback\n");
         return SA_ERROR;
     };
-    return close_playback_thread(device);
+    return SA_SUCCESS;
     // TODO CLEANUP
 }
 
