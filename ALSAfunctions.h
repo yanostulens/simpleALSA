@@ -163,13 +163,12 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager);
  */
 sa_result xrun_recovery(snd_pcm_t *handle, int err);
 /**
- * @brief reclaims sa_device and poll_manager
+ * @brief reclaims sa_device
  *
  * @param device
- * @param poll_manager
  * @return sa_result
  */
-sa_result cleanup(sa_device *device, sa_poll_management *poll_manager);
+sa_result cleanup_device(sa_device *device);
 /**
  * @brief Messages a char to the playback thread via a pipe
  *
@@ -213,5 +212,13 @@ sa_result unpause_PCM_handle(sa_device *device);
  * @return sa_result
  */
 sa_result prepare_alsa_device(sa_device *device);
+
+/**
+ * @brief Destroys the ALSA device, closes threads and frees all allocated memory
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result destroy_alsa_device(sa_device *device);
 
 #endif  // ALSAFUNCTIONS_H_

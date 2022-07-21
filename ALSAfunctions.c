@@ -262,7 +262,7 @@ void *init_playback_thread(void *data) {
             }
         }
     }
-    // TODO DEVICE CLEANUP HERE
+    free(pipe_read_end_fd);
     return NULL;
 }
 
@@ -607,15 +607,37 @@ sa_result message_pipe(sa_device *device, char toSend) {
     return SA_SUCCESS;
 }
 
-sa_result cleanup(sa_device *device, sa_poll_management *poll_manager) {
+sa_result cleanup_device(sa_device *device) {
     if(device)
     {
         if(device->config)
+        { free(device->config); }
+        /*
+        if(device->hwparams)
         {
-            if(device->config->device)
-            { free(device->config->device); }
-            free(device->config);
+            if(snd_pcm_hw_free(device->hwparams))
+            { SA_LOG(ERROR, "ALSA: Error freeing hardware params"); }
         }
+        if(device->swparams)
+        {
+            snd_pcm_sw_params_free(&device->swparams);
+        }*/
+        if(device->samples)
+        { free(device->samples); }
+        if(device->handle)
+        { snd_pcm_close(device->handle); }
+        free(device);
     }
     return SA_SUCCESS;
+}
+
+sa_result destroy_alsa_device(sa_device *device) {
+    stop_alsa_device(device);
+    message_pipe(device, 'd');
+    if(close_playback_thread(device) == SA_ERROR)
+    {
+        SA_LOG(ERROR, "Could not close thread");
+        exit(EXIT_FAILURE);
+    }
+    return cleanup_device(device);
 }
