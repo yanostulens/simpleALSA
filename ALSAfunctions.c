@@ -313,7 +313,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     if((err = snd_pcm_poll_descriptors(device->handle, poll_manager_temp->ufds + 1,
                                        poll_manager_temp->count - 1)) < 0)
     {
-        SA_LOG("Unable to obtain poll descriptors for playback", snd_strerror(err));
+        SA_LOG(ERROR, "Unable to obtain poll descriptors for playback", snd_strerror(err));
         return SA_ERROR;
     }
     *poll_manager = poll_manager_temp;
@@ -613,20 +613,17 @@ sa_result cleanup_device(sa_device *device) {
     {
         if(device->config)
         { free(device->config); }
-        /*
-        if(device->hwparams)
-        {
-            if(snd_pcm_hw_free(device->hwparams))
-            { SA_LOG(ERROR, "ALSA: Error freeing hardware params"); }
-        }
-        if(device->swparams)
-        {
-            snd_pcm_sw_params_free(&device->swparams);
-        }*/
+
         if(device->samples)
         { free(device->samples); }
         if(device->handle)
-        { snd_pcm_close(device->handle); }
+        {
+            if(snd_pcm_close(device->handle) != 0)
+            {
+                SA_LOG(ERROR, "ALSA: Failed to close the PCM handle");
+                return SA_ERROR;
+            }
+        }
         free(device);
     }
     return SA_SUCCESS;
