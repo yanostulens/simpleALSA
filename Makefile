@@ -15,6 +15,10 @@ pc: $(FILES)
 	mkdir -p builds
 	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
 
+pc_s:
+	mkdir -p builds
+	$(COMPILER) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
+
 example: $(EXAMPLE_MAIN)
 	mkdir -p builds
 	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
@@ -29,3 +33,6 @@ run:
 
 valgrind:
 	valgrind --leak-check=yes --show-leak-kinds=definite,indirect,possible --error-exitcode=1 --suppressions=./valgrind.supp ./builds/alsaPlayer2.bin
+
+header:
+	quom ./src/simpleALSA_API/simpleALSA.h ./single_header/simpleALSA.h
