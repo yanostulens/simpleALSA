@@ -1,10 +1,8 @@
 #include <sndfile.h>
 #include <stdio.h>
 
-/**#include "./logger/logger.h"
-#include "./simpleALSA_API/simpleALSA.h"**/
-
-#include "../single_header/simpleALSA.h"
+#include "./logger/logger.h"
+#include "./simpleALSA_API/simpleALSA.h"
 
 void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     SNDFILE *infile_temp = sf_open(infilename, SFM_READ, sfinfo);
@@ -16,9 +14,9 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     *infile = infile_temp;
 }
 
-int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device) {
-    SNDFILE *infile = (SNDFILE *) sa_device->myCustomData;
-    return (sf_readf_short(infile, sa_device->samples, sa_device->periodSize) > 0);
+int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData) {
+    SNDFILE *infile = (SNDFILE *) myCustomData;
+    return (sf_readf_short(infile, sa_device->samples, framesToSend) > 0);
 }
 
 int main(int argc, char const *argv[]) {

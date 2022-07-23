@@ -1,6 +1,7 @@
 #include <pthread.h>
 
 #include "./ALSAfunctions.h"
+
 #include "../logger/logger.h"
 
 sa_result init_alsa_device(sa_device *device) {
@@ -358,9 +359,10 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             } else if(err == SA_CANCEL)
             { return SA_CANCEL; }
         }
-        int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device) =
-          (int (*)(int, void *, sa_device *)) device->config->callbackFunction;
-        readcount = callbackFunction(device->periodSize, device->samples, device);
+        int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device,
+                                void *myCustomData) = (int (*)(int, void *,
+                                                               sa_device *, void* myCustomData)) device->config->callbackFunction;
+        readcount = callbackFunction(device->periodSize, device->samples, device, device->myCustomData);
 
         /** If the callback has not written any frames - there are no frames left so we stop the callback loop */
         if(!readcount)
