@@ -1,38 +1,31 @@
-CC_PC := gcc
-CFLAGS := -Wall -O2
+COMPILER := gcc
+CFLAGS := -Wall
+OPTIMIZATION := -O2
+DEBUG_FLAG := -g
 LIBS := -lasound -lm -lsndfile -lpthread
 
-OUT_PC := -o ./builds/alsaPlayer2.bin
+OUTPUT := ./builds/simpleALSA.bin
+OUTPUT_DEBUG := ./builds/simpleALSA_debug.bin
 
-MAIN := ./simpleALSA_main.c
-EXAMPLE_MAIN:= ./main.c
-FILES := ./ALSAfunctions.c ./simpleALSA.c ./logger.c
-LOG_FLAGS := 
+EXAMPLE_MAIN:= ./src/simpleALSA_example_main.c
+DEBUG_MAIN := ./src/experimental_mains/simpleALSA_example_main.c
+FILES := ./src/ALSAfunctions/ALSAfunctions.c ./src/simpleALSA_API/simpleALSA.c ./src/logger/logger.c
 
 pc: $(FILES)
 	mkdir -p builds
-	mkdir -p builds
-	$(CC_PC) $(FILES) $(MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
+	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
 
 example: $(EXAMPLE_MAIN)
 	mkdir -p builds
-	mkdir -p builds
-	$(CC_PC) $(FILES) $(EXAMPLE_MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
-
-test_poll: ./main_with_polldescr.c
-	mkdir -p builds
-	mkdir -p builds
-	$(CC_PC) ./main_with_polldescr.c $(OUT_PC) $(CFLAGS) $(LIBS)
-
-run:
-	./builds/alsaPlayer2.bin
-
-valgrind:
-	valgrind --leak-check=yes --show-leak-kinds=definite,indirect,possible --error-exitcode=1 --suppressions=./valgrind.supp ./builds/alsaPlayer2.bin
-
+	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
 
 debug: $(FILES)
 	mkdir -p builds
-	mkdir -p builds
-	$(CC_PC) $(FILES) $(MAIN) $(OUT_PC) $(CFLAGS) -g $(LIBS) -o debugging
-	gdb debugging
+	$(CC_PC) $(FILES) $(DEBUG_MAIN) $(OUT_PC) $(CFLAGS) $(DEBUG_FLAG) $(LIBS) -o $(OUTPUT_DEBUG) 
+	gdb $(OUTPUT_DEBUG)
+
+run:
+	./builds/simpleALSA.bin
+
+valgrind:
+	valgrind --leak-check=yes --show-leak-kinds=definite,indirect,possible --error-exitcode=1 --suppressions=./valgrind.supp ./builds/alsaPlayer2.bin
