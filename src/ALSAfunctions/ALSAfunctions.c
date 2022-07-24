@@ -262,7 +262,7 @@ void *init_playback_thread(void *data) {
                 case 'd':
                     break;
                 default:
-                    SA_LOG(WARNING, "Invalid command send to the pipe");
+                    SA_LOG(WARNING, "Invalid command sent to the pipe");
                     continue;
                 }
                 SA_LOG(DEBUG, "Attempting to destroy the device");
@@ -352,7 +352,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
-                        SA_LOG(ERROR, "Write error:", snd_strerror(err));
+                        SA_LOG(ERROR, "ALSA: Write error:", snd_strerror(err));
                         return SA_ERROR;
                     }
                     init = 1;
@@ -600,9 +600,12 @@ sa_result drop_alsa_device(sa_device *device) {
     {
         err = snd_pcm_drop(device->handle);
         if(err == 0)
+        {
             return SA_SUCCESS;
+        } else
+        { SA_LOG(ERROR, "ALSA: snd_pcm_drop() failed: ", snd_strerror(err)); }
     }
-    SA_LOG(ERROR, "Failed to drain samples from the ALSA device", snd_strerror(err));
+    SA_LOG(ERROR, "Failed to drop samples from the ALSA device: pcm_hanlde not in runnning or paused state");
     exit(EXIT_FAILURE);
 }
 
@@ -614,9 +617,12 @@ sa_result drain_alsa_device(sa_device *device) {
     {
         err = snd_pcm_drain(device->handle);
         if(err == 0)
+        {
             return SA_SUCCESS;
+        } else
+        { SA_LOG(ERROR, "ALSA: snd_pcm_drain() failed: ", snd_strerror(err)); }
     }
-    SA_LOG(ERROR, "Failed to drop samples from the ALSA device", snd_strerror(err));
+    SA_LOG(ERROR, "Failed to drain samples from the ALSA device: pcm_handle not in runnning or paused state");
     exit(EXIT_FAILURE);
 }
 

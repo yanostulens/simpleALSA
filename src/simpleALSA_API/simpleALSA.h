@@ -24,11 +24,12 @@
     #endif
 
     #if !defined(DEFAULT_BUFFER_TIME)
-        #define DEFAULT_BUFFER_TIME 500000 /** in µS - so half a second here */
+        #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
     #endif
 
     #if !defined(DEFAULT_PERIOD_TIME)
-        #define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
+        #define DEFAULT_PERIOD_TIME \
+            200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
     #endif
 
 /** FUNCTIONS DEFINITIONS **/

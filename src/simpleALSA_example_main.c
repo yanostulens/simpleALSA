@@ -1,6 +1,7 @@
 #include <sndfile.h>
 #include <stdio.h>
 
+#include "./ALSAfunctions/ALSAfunctions.h"
 #include "./logger/logger.h"
 #include "./simpleALSA_API/simpleALSA.h"
 
@@ -21,7 +22,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/big_dogs.wav";
+    char *infilename = "./audioFiles/mix.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -52,6 +53,9 @@ int main(int argc, char const *argv[]) {
         {
             sa_stop_device(device);
             sf_seek(infile, 0, SEEK_SET);
+        } else if(strcmp(input, "prep\n") == 0)
+        {
+            prepare_alsa_device(device);
         } else if(strcmp(input, "destroy\n") == 0)
         {
             sa_destroy_device(device);
