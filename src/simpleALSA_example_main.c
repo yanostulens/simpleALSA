@@ -55,7 +55,8 @@ int main(int argc, char const *argv[]) {
         {
             sa_destroy_device(device);
             break;
-        }
+        } else if(strcmp(input, "rewind\n") == 0)
+        { sf_seek(infile, 0, SEEK_SET); }
     }
     sf_close(infile);
     return 0;
