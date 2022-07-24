@@ -9,7 +9,7 @@ MAIN:= ./example.c
 
 pc: $(FILES)
 	mkdir -p builds
-	$(COMPILER) $(MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
+	$(COMPILER) $(MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) -DSA_DEBUG
 
 run:
 	./builds/simpleALSA.bin
