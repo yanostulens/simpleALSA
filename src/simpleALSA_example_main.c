@@ -20,8 +20,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/california.wav";
-    // infilename       = "/home/daan/Thesis/alsa/simpleALSA/audioFiles/california.wav";
+    char *infilename = "./audioFiles/big_dogs.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -38,7 +37,7 @@ int main(int argc, char const *argv[]) {
     device->myCustomData = (void *) infile;
     while(1)
     {
-        SA_LOG(DEBUG, "Give a command please...");
+        printf("Give a command please...\n");
         char input[20];
         fgets(input, 20, stdin);
 

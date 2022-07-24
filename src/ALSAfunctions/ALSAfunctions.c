@@ -254,6 +254,9 @@ void *init_playback_thread(void *data) {
                 case 'u':
                     if(start_write_and_poll_loop(device, pipe_read_end_fd) == SA_ERROR)
                     { break; }
+                    /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
+                    drain_alsa_device(device);
+                    prepare_alsa_device(device);
                     continue;
                 /** Destroy command, no continue; break out of while */
                 case 'd':
