@@ -26,17 +26,14 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
  *
  */
 
-int callback_function(int framesToSend, void *audioBuffer,
-                      sa_device *sa_device) {
-  SNDFILE *infile = (SNDFILE *)sa_device->myCustomData;
-  return (sf_readf_short(infile, sa_device->samples, sa_device->periodSize) >
-          0);
+int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
+                      void *myCustomData) {
+  SNDFILE *infile = (SNDFILE *)myCustomData;
+  return (sf_readf_short(infile, audioBuffer, framesToSend) > 0);
 }
 
 int main(int argc, char const *argv[]) {
   char *infilename = "./audioFiles/california.wav";
-  // infilename       =
-  // "/home/daan/Thesis/alsa/simpleALSA/audioFiles/california.wav";
   SF_INFO sfinfo;
   SNDFILE *infile = NULL;
 
