@@ -77,8 +77,8 @@ int main(int argc, char const *argv[]) {
   /** Assign custom data to the device */
   device->myCustomData = (void *)infile;
 
-  /** For demonstation purposes we start an endless loop that listens from
-   * command from stdin */
+  /** For demonstation purposes we start an endless loop that listens for
+   * commands from stdin */
   while (1) {
     printf("Give a command please...\n");
     char input[20];
