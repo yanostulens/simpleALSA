@@ -364,13 +364,15 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             } else if(err == SA_CANCEL)
             { return SA_CANCEL; }
         }
-        /** If the callback has not written any frames in the previous call- there are no frames left so we stop the callback loop */
-        if(!readcount)
-        { break; }
+
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device,
                                 void *myCustomData) =
           (int (*)(int, void *, sa_device *, void *myCustomData)) device->config->callbackFunction;
         readcount = callbackFunction(device->periodSize, device->samples, device, device->myCustomData);
+
+        /** If the callback has not written any frames in the previous call- there are no frames left so we stop the callback loop */
+        if(readcount == 0)
+        { break; }
 
         ptr  = device->samples;
         cptr = device->periodSize;
@@ -415,6 +417,8 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             } else if(err == SA_CANCEL)
             { return SA_CANCEL; }
         }
+        if(readcount < device->periodSize)
+        { break; }
     }
     return SA_SUCCESS;
 }
