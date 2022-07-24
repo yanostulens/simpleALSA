@@ -4,6 +4,7 @@ The purpose of this library is to provide an easy to use wrapper around the rath
 Want to give it a try? Have a look at the example.c file! 
 Make sure to compile with: `-lasound -lsndfile -lpthread` or just use the included Makefile!
 
+At the moment simpleALSA.h is working, it is however still under construction, so the API might still change.
 
 Credits must be given to the miniaudio library (https://github.com/mackron/miniaudio), as simpleALSA work in a similar way.
 
