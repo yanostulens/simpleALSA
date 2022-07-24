@@ -26,7 +26,7 @@ sa_result init_alsa_device(sa_device *device) {
         exit(EXIT_FAILURE);
     }
 
-    device->samples = (signed short *) malloc((device->periodSize * device->config->channels *
+    device->samples = (int *) malloc((device->periodSize * device->config->channels *
                                                snd_pcm_format_physical_width(device->config->format)) /
                                               8);
 
@@ -345,7 +345,7 @@ sa_result close_playback_thread(sa_device *device) {
 }
 
 sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
-    signed short *ptr;
+    int *ptr;
     int err, cptr, init, readcount;
     readcount = 1;
     init      = 1;

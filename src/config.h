@@ -78,7 +78,7 @@ struct sa_device
     snd_pcm_sw_params_t *swparams;
 
     /** Pointer to the place is memory where audio samples are written right before being send to the ALSA buffer */
-    signed short *samples;
+    int *samples;
 
     /** Indicates support for the hardware to pause the pcm stream */
     bool supportsPause;
