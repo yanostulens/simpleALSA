@@ -94,7 +94,15 @@ sa_result unpause_alsa_device(sa_device *device);
 sa_result stop_alsa_device(sa_device *device);
 
 /**
- * @brief Drains the samples of the internal ALSA buffer
+ * @brief Drops the samples of the internal ALSA buffer and stop the ALSA pcm handle
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result drop_alsa_device(sa_device *device);
+
+/**
+ * @brief Drains the samples of the internal ALSA buffer and stops the ALSA pcm handle
  *
  * @param device
  * @return sa_result
@@ -190,7 +198,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 
 /**
  * @brief Checks whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
- * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_drain().
+ * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_prepare().
  *
  * @param device
  * @return sa_result

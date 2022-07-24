@@ -255,7 +255,7 @@ void *init_playback_thread(void *data) {
                     if(start_write_and_poll_loop(device, pipe_read_end_fd) == SA_ERROR)
                     { break; }
                     /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
-                    //  drain_alsa_device(device);
+                    drain_alsa_device(device);
                     prepare_alsa_device(device);
                     continue;
                 /** Destroy command, no continue; break out of while */
@@ -438,7 +438,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 {
                 /** Stop playack */
                 case 's':
-                    drain_alsa_device(device);
+                    drop_alsa_device(device);
                     prepare_alsa_device(device);
                     return SA_CANCEL;
                     break;
@@ -483,7 +483,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
             {
             /** Stop playback */
             case 's':
-                drain_alsa_device(device);
+                drop_alsa_device(device);
                 prepare_alsa_device(device);
                 return SA_CANCEL;
                 break;
@@ -501,6 +501,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 }
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
+    SA_LOG(DEBUG, "ASLA xrun occured");
     if(err == -EPIPE)
     { /* Underrun */
         err = snd_pcm_prepare(handle);
@@ -568,7 +569,7 @@ sa_result pause_PCM_handle(sa_device *device) {
         return SA_SUCCESS;
     } else
     {
-        if(drain_alsa_device(device) == SA_SUCCESS && prepare_alsa_device(device) == SA_SUCCESS)
+        if(drop_alsa_device(device) == SA_SUCCESS && prepare_alsa_device(device) == SA_SUCCESS)
             return SA_SUCCESS;
     }
     return SA_ERROR;
@@ -586,17 +587,36 @@ sa_result unpause_PCM_handle(sa_device *device) {
     return SA_SUCCESS;
 }
 
+sa_result drop_alsa_device(sa_device *device) {
+    SA_LOG(DEBUG, "ALSA drop called");
+    int err = 0;
+    if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
+                          snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED))
+    {
+        err = snd_pcm_drop(device->handle);
+        if(err == 0)
+            return SA_SUCCESS;
+    }
+    SA_LOG(ERROR, "Failed to drain samples from the ALSA device", snd_strerror(err));
+    exit(EXIT_FAILURE);
+}
+
 sa_result drain_alsa_device(sa_device *device) {
-    if(device->handle &&
-       (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
-        snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED) &&
-       snd_pcm_drop(device->handle) == 0)
-    { return SA_SUCCESS; }
-    SA_LOG(ERROR, "Failed to drop samples from the ALSA device");
+    SA_LOG(DEBUG, "ALSA drain called");
+    int err = 0;
+    if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
+                          snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED))
+    {
+        err = snd_pcm_drain(device->handle);
+        if(err == 0)
+            return SA_SUCCESS;
+    }
+    SA_LOG(ERROR, "Failed to drop samples from the ALSA device", snd_strerror(err));
     exit(EXIT_FAILURE);
 }
 
 sa_result prepare_alsa_device(sa_device *device) {
+    SA_LOG(DEBUG, "ALSA prepare called");
     if(device->handle && snd_pcm_prepare(device->handle) == 0)
     { return SA_SUCCESS; }
     SA_LOG(ERROR, "Failed to prepare the ALSA device");
