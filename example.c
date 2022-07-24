@@ -46,7 +46,7 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
 int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
                       void *myCustomData) {
   SNDFILE *infile = (SNDFILE *)myCustomData;
-  return sf_readf_short(infile, audioBuffer, framesToSend);
+  return sf_readf_int(infile, audioBuffer, framesToSend);
 }
 
 int main(int argc, char const *argv[]) {
@@ -67,7 +67,8 @@ int main(int argc, char const *argv[]) {
   config->callbackFunction = &callback_function;
   config->sampleRate = sfinfo.samplerate;
   config->channels = sfinfo.channels;
-  config->format = SND_PCM_FORMAT_S16_LE;
+  /** We set the format to signed 32 bit here because libsndfile reads out frames as 32 bit intergers (see callback_function) */
+  config->format = SND_PCM_FORMAT_S32_LE;
 
   /** After the configuration we can initialize the device */
   sa_init_device(config, &device);
@@ -80,24 +81,24 @@ int main(int argc, char const *argv[]) {
   while (1) {
     printf("Give a command please...\n");
     char input[20];
-    fgets(input, 20, stdin);
-
-    if (strcmp(input, "play\n") == 0) {
-      /** A play command will start the sa_device */
-      sa_start_device(device);
-    } else if (strcmp(input, "pause\n") == 0) {
-      /** Pause */
-      sa_pause_device(device);
-    } else if (strcmp(input, "stop\n") == 0) {
-      /** Stop */
-      sa_stop_device(device);
-    } else if (strcmp(input, "rewind\n") == 0) {
-      /** Reset the file reader from sndfile to read from the start again */
-      sf_seek(infile, 0, SEEK_SET);
-    } else if (strcmp(input, "destroy\n") == 0) {
-      /** Destory the sa_device - this will also clear all resources */
-      sa_destroy_device(device);
-      break;
+    if (fgets(input, 20, stdin)) {
+      if (strcmp(input, "play\n") == 0) {
+        /** A play command will start the sa_device */
+        sa_start_device(device);
+      } else if (strcmp(input, "pause\n") == 0) {
+        /** Pause */
+        sa_pause_device(device);
+      } else if (strcmp(input, "stop\n") == 0) {
+        /** Stop */
+        sa_stop_device(device);
+      } else if (strcmp(input, "rewind\n") == 0) {
+        /** Reset the file reader from sndfile to read from the start again */
+        sf_seek(infile, 0, SEEK_SET);
+      } else if (strcmp(input, "destroy\n") == 0) {
+        /** Destory the sa_device - this will also clear all resources */
+        sa_destroy_device(device);
+        break;
+      }
     }
   }
   sf_close(infile);
