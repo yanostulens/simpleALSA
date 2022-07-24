@@ -1,13 +1,13 @@
 COMPILER := gcc
 CFLAGS := -Wall
 OPTIMIZATION := -O2
-LIBS := -lasound -lm -lsndfile -lpthread
+LIBS := -lasound -lsndfile -lpthread
 
 OUTPUT := ./builds/simpleALSA.bin
 
 MAIN:= ./example.c
 
-pc: $(FILES)
+main: $(FILES)
 	mkdir -p builds
 	$(COMPILER) $(MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
 

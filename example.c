@@ -51,7 +51,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
 
 int main(int argc, char const *argv[]) {
   /** Init sndfile */
-  char *infilename = "./audioFiles/mix.wav";
+  char *infilename = "yourFile.wav";
   SF_INFO sfinfo;
   SNDFILE *infile = NULL;
   initSndFile(infilename, &sfinfo, &infile);
@@ -67,7 +67,8 @@ int main(int argc, char const *argv[]) {
   config->callbackFunction = &callback_function;
   config->sampleRate = sfinfo.samplerate;
   config->channels = sfinfo.channels;
-  /** We set the format to signed 32 bit here because libsndfile reads out frames as 32 bit intergers (see callback_function) */
+  /** We set the format to signed 32 bit here because libsndfile reads out
+   * frames as 32 bit intergers (see callback_function) */
   config->format = SND_PCM_FORMAT_S32_LE;
 
   /** After the configuration we can initialize the device */
