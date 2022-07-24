@@ -333,12 +333,14 @@ sa_result close_playback_thread(sa_device *device) {
 sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     signed short *ptr;
     int err, cptr, init, readcount;
-    init = 1;
+    readcount = 1;
+    init      = 1;
     while(1)
     {
         if(!init)
         {
             err = wait_for_poll(device, poll_manager);
+
             if(err < 0)
             {
                 if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
@@ -359,14 +361,13 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             } else if(err == SA_CANCEL)
             { return SA_CANCEL; }
         }
+        /** If the callback has not written any frames in the previous call- there are no frames left so we stop the callback loop */
+        if(!readcount)
+        { break; }
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device,
                                 void *myCustomData) =
           (int (*)(int, void *, sa_device *, void *myCustomData)) device->config->callbackFunction;
         readcount = callbackFunction(device->periodSize, device->samples, device, device->myCustomData);
-
-        /** If the callback has not written any frames - there are no frames left so we stop the callback loop */
-        if(!readcount)
-        { break; }
 
         ptr  = device->samples;
         cptr = device->periodSize;
