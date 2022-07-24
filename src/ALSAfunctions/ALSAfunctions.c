@@ -363,8 +363,8 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             { return SA_CANCEL; }
         }
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device,
-                                void *myCustomData) = (int (*)(int, void *,
-                                                               sa_device *, void* myCustomData)) device->config->callbackFunction;
+                                void *myCustomData) =
+          (int (*)(int, void *, sa_device *, void *myCustomData)) device->config->callbackFunction;
         readcount = callbackFunction(device->periodSize, device->samples, device, device->myCustomData);
 
         /** If the callback has not written any frames - there are no frames left so we stop the callback loop */
@@ -554,7 +554,6 @@ sa_result stop_alsa_device(sa_device *device) {
         return SA_ERROR;
     };
     return SA_SUCCESS;
-    // TODO CLEANUP
 }
 
 sa_result pause_PCM_handle(sa_device *device) {
