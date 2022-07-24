@@ -252,17 +252,27 @@ void *init_playback_thread(void *data) {
                 {
                 /** Play command */
                 case 'u':
-                    if(start_write_and_poll_loop(device, pipe_read_end_fd) == SA_ERROR)
-                    { break; }
-                    /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
-                    drain_alsa_device(device);
-                    prepare_alsa_device(device);
+                    sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
+                    /** The write and poll loop can end in three ways: error, a stop command is sent, or no more audio is send to the audiobuffer */
+                    if(res == SA_ERROR)
+                        break;
+                    if(res == SA_STOP)
+                    {
+                        drop_alsa_device(device);
+                        prepare_alsa_device(device);
+                    }
+                    if(res == SA_AT_END)
+                    {
+                        /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
+                        drain_alsa_device(device);
+                        prepare_alsa_device(device);
+                    }
                     continue;
                 /** Destroy command, no continue; break out of while */
                 case 'd':
                     break;
                 default:
-                    SA_LOG(WARNING, "Invalid command sent to the pipe");
+                    SA_LOG(WARNING, "Command sent to the pipe is ignored");
                     continue;
                 }
                 SA_LOG(DEBUG, "Attempting to destroy the device");
@@ -276,19 +286,20 @@ void *init_playback_thread(void *data) {
 }
 
 sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd) {
+    sa_result result                 = SA_ERROR;
     sa_poll_management *poll_manager = NULL;
     /** Init the poll manager */
     if(init_poll_management(device, &poll_manager, pipe_read_end_fd) != SA_SUCCESS)
     {
         SA_LOG(ERROR, "Could not initialize the poll manager");
-        return SA_ERROR;
+        return result;
     }
-    write_and_poll_loop(device, poll_manager);
+    result = write_and_poll_loop(device, poll_manager);
     /** Cleanup */
     free(poll_manager->ufds);
     free(poll_manager);
     poll_manager = NULL;
-    return SA_SUCCESS;
+    return result;
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
@@ -361,8 +372,8 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     SA_LOG(ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
-            } else if(err == SA_CANCEL)
-            { return SA_CANCEL; }
+            } else if(err == SA_STOP)
+            { return SA_STOP; }
         }
         /** If the callback has not written any frames in the previous call- there are no frames left so we stop the callback loop */
 
@@ -372,7 +383,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
         readcount = callbackFunction(device->periodSize, device->samples, device, device->myCustomData);
 
         if(readcount == 0)
-        { break; }
+        { return SA_AT_END; }
 
         ptr  = device->samples;
         cptr = readcount;
@@ -415,11 +426,11 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     SA_LOG(ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
-            } else if(err == SA_CANCEL)
-            { return SA_CANCEL; }
+            } else if(err == SA_STOP)
+            { return SA_STOP; }
         }
         if(readcount < device->periodSize)
-        { break; }
+        { return SA_AT_END; }
     }
     return SA_SUCCESS;
 }
@@ -443,17 +454,19 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 {
                 /** Stop playack */
                 case 's':
-                    drop_alsa_device(device);
-                    prepare_alsa_device(device);
-                    return SA_CANCEL;
+                    return SA_STOP;
                     break;
                 /** Pause playback */
                 case 'p':
-                    if(pause_callback_loop(poll_manager, device) == SA_CANCEL)
-                    { return SA_CANCEL; }
+                    sa_result res = pause_callback_loop(poll_manager, device);
+                    /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
+                    if(res == SA_STOP)
+                        return SA_STOP;
+                    if(res == SA_UNPAUSE)
+                        unpause_PCM_handle(device);
                     break;
                 default:
-                    SA_LOG(WARNING, "Invalid command send to pipe");
+                    SA_LOG(WARNING, "Command send to the pipe is ignored");
                     break;
                 }
             }
@@ -488,14 +501,11 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
             {
             /** Stop playback */
             case 's':
-                drop_alsa_device(device);
-                prepare_alsa_device(device);
-                return SA_CANCEL;
+                return SA_STOP;
                 break;
             /** Unpause */
             case 'u':
-                unpause_PCM_handle(device);
-                return SA_SUCCESS;
+                return SA_UNPAUSE;
                 break;
             default:
                 break;
@@ -506,13 +516,13 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 }
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
-    SA_LOG(DEBUG, "ASLA xrun occured");
+    SA_LOG(DEBUG, "ASLA: xrun occured");
     if(err == -EPIPE)
     { /* Underrun */
         err = snd_pcm_prepare(handle);
         if(err < 0)
         {
-            SA_LOG(ERROR, "Can't recover from underrun, prepare failed:", snd_strerror(err));
+            SA_LOG(ERROR, "ALSA: Can't recover from underrun, prepare failed:", snd_strerror(err));
             return SA_ERROR;
         }
     } else if(err == -ESTRPIPE)
@@ -527,7 +537,7 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
             err = snd_pcm_prepare(handle);
             if(err < 0)
             {
-                SA_LOG(ERROR, "Can't recover from suspend, prepare failed:", snd_strerror(err));
+                SA_LOG(ERROR, "ALSA: Can't recover from suspend, prepare failed:", snd_strerror(err));
                 return SA_ERROR;
             }
         }
@@ -568,7 +578,7 @@ sa_result pause_PCM_handle(sa_device *device) {
     {
         if(snd_pcm_pause(device->handle, 1) != 0)
         {
-            SA_LOG(ERROR, "Failed to snd_pcm_pause the pcm handle (when pausing)");
+            SA_LOG(ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when pausing)");
             return SA_ERROR;
         }
         return SA_SUCCESS;
@@ -585,7 +595,7 @@ sa_result unpause_PCM_handle(sa_device *device) {
     {
         if(snd_pcm_pause(device->handle, 0) != 0)
         {
-            SA_LOG(ERROR, "Failed to snd_pcm_pause the pcm handle (when resuming)");
+            SA_LOG(ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when resuming)");
             return SA_ERROR;
         }
     }

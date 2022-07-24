@@ -2,35 +2,7 @@
     #define SIMPLEALSA_H_
 
     #include <alsa/asoundlib.h>
-
     #include "../config.h"
-
-/** MACROS **/
-
-    #if !defined(DEFAULT_DEVICE)
-        #define DEFAULT_DEVICE "default"
-    #endif
-
-    #if !defined(DEFAULT_SAMPLE_RATE)
-        #define DEFAULT_SAMPLE_RATE 48000
-    #endif
-
-    #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-        #define DEFAULT_NUMBER_OF_CHANNELS 2
-    #endif
-
-    #if !defined(DEFAULT_AUDIO_FORMAT)
-        #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-    #endif
-
-    #if !defined(DEFAULT_BUFFER_TIME)
-        #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
-    #endif
-
-    #if !defined(DEFAULT_PERIOD_TIME)
-        #define DEFAULT_PERIOD_TIME \
-            200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
-    #endif
 
 /** FUNCTIONS DEFINITIONS **/
 

@@ -22,7 +22,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/mix.wav";
+    char *infilename = "./audioFiles/big_dogs.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
