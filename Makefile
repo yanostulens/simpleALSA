@@ -37,3 +37,6 @@ valgrind:
 
 header:
 	quom ./src/simpleALSA_API/simpleALSA.h ./single_header/simpleALSA.h
+	
+test:
+	echo "hello"
