@@ -6,7 +6,9 @@ jobs:
     steps:
       - name: checkout repo
         uses: actions/checkout@v2
-      - name: make dir
-        run: mkdir build
-      - name: build application
-        run: make build
+      - name: install dependencies
+        run:  sudo apt-cache install libasound-dev -y
+              sudo apt-cache install libsndfile-dev -y
+      - name: build
+        run:  mkdir build
+              make pc
