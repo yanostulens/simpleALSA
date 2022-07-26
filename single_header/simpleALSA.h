@@ -2,14 +2,14 @@
     #define SIMPLEALSA_H_
 
     #include <alsa/asoundlib.h>
-    #ifndef _CONFIG_H_
-#define _CONFIG_H_
+    #ifndef SIMPLEALSACONFIG_H
+#define SIMPLEALSACONFIG_H
 
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef SIMPLEALSALOGGER_H
+#define SIMPLEALSALOGGER_H
 
 #define SA_LOG_2_ARGS(type, msg0)        sa_log(type, msg0, "")
 #define SA_LOG_3_ARGS(type, msg0, msg1)  sa_log(type, msg0, msg1)
@@ -38,7 +38,7 @@ typedef enum
 
 void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
-#endif  // LOGGER_H
+#endif  // SIMPLEALSALOGGER_H
 
 /** MACROS **/
 
@@ -185,7 +185,7 @@ typedef struct
     struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-#endif /* _CONFIG_H_ */
+#endif // SIMPLEALSACONFIG_H
 
 /** FUNCTIONS DEFINITIONS **/
 
