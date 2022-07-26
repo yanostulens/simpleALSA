@@ -1,12 +1,10 @@
-name: learn-github-actions
+name: test-github-actions
 on: [push]
 jobs:
-  check-bats-version:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '14'
-      - run: npm install -g bats
-      - run: bats -v
+      - name: checkout repo
+        uses: actions/checkout@v2
+      - name: build application
+        run: make build
