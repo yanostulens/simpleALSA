@@ -7,8 +7,8 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@v2
       - name: install dependencies
-        run:  sudo apt-get install libasound-dev -y
-              sudo apt-get install libsndfile-dev -y
+        run:  sudo apt-cache install libasound-dev -y
+              sudo apt-cache install libsndfile-dev -y
       - name: build
         run:  mkdir build
               make pc
