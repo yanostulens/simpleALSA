@@ -3,25 +3,27 @@
 
     #include <alsa/asoundlib.h>
     #ifndef SIMPLEALSACONFIG_H
-        #define SIMPLEALSACONFIG_H
+#define SIMPLEALSACONFIG_H
 
-        #include <alsa/asoundlib.h>
-        #include <stdbool.h>
+#include <alsa/asoundlib.h>
+#include <stdbool.h>
 
-        #ifndef SIMPLEALSALOGGER_H
-            #define SIMPLEALSALOGGER_H
+#ifndef SIMPLEALSALOGGER_H
+#define SIMPLEALSALOGGER_H
 
-            #define SA_LOG_2_ARGS(type, msg0)       sa_log(type, msg0, "")
-            #define SA_LOG_3_ARGS(type, msg0, msg1) sa_log(type, msg0, msg1)
+#define SA_LOG_2_ARGS(type, msg0)        sa_log(type, msg0, "")
+#define SA_LOG_3_ARGS(type, msg0, msg1)  sa_log(type, msg0, msg1)
 
-            #define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
-            #define SA_LOG_MACRO_CHOOSER(...)                GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, SA_LOG_2_ARGS, )
+#define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
+#define SA_LOG_MACRO_CHOOSER(...) \
+    GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, \
+                SA_LOG_2_ARGS, )
 
-            #if defined SA_NO_LOGS
-                #define SA_LOG(...) ((void) 0)
-            #else
-                #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-            #endif
+#if defined SA_NO_LOGS
+    #define SA_LOG(...) ((void) 0)
+#else
+    #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+#endif
 
 /**
  * @brief enum to identify different types of logs
@@ -36,38 +38,38 @@ typedef enum
 
 void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
-        #endif  // SIMPLEALSALOGGER_H
+#endif  // SIMPLEALSALOGGER_H
 
-    /** MACROS **/
+/** MACROS **/
 
-        #if !defined(DEFAULT_DEVICE)
-            #define DEFAULT_DEVICE "default"
-        #endif
+#if !defined(DEFAULT_DEVICE)
+    #define DEFAULT_DEVICE "default"
+#endif
 
-        #if !defined(DEFAULT_SAMPLE_RATE)
-            #define DEFAULT_SAMPLE_RATE 48000
-        #endif
+#if !defined(DEFAULT_SAMPLE_RATE)
+    #define DEFAULT_SAMPLE_RATE 48000
+#endif
 
-        #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-            #define DEFAULT_NUMBER_OF_CHANNELS 2
-        #endif
+#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+    #define DEFAULT_NUMBER_OF_CHANNELS 2
+#endif
 
-        #if !defined(DEFAULT_AUDIO_FORMAT)
-            #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-        #endif
+#if !defined(DEFAULT_AUDIO_FORMAT)
+    #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
+#endif
 
-        #if !defined(DEFAULT_BUFFER_TIME)
-            #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
-        #endif
+#if !defined(DEFAULT_BUFFER_TIME)
+    #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
+#endif
 
-        #if !defined(DEFAULT_PERIOD_TIME)
-            #define DEFAULT_PERIOD_TIME \
-                200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
-        #endif
+#if !defined(DEFAULT_PERIOD_TIME)
+    #define DEFAULT_PERIOD_TIME \
+        200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
+#endif
 
-        #if !defined(SA_DEBUG)
-            #define SA_NO_DEBUG_LOGS
-        #endif
+#if !defined(SA_DEBUG)
+    #define SA_NO_DEBUG_LOGS
+#endif
 
 /** ENUMS **/
 
@@ -203,7 +205,7 @@ typedef struct
     struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-    #endif  // SIMPLEALSACONFIG_H
+#endif  // SIMPLEALSACONFIG_H
 
 /** FUNCTIONS DEFINITIONS **/
 
@@ -281,9 +283,10 @@ void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     fflush(stdout);
 }
 
+
 #ifndef ALSAFUNCTIONS_H_
-    #define ALSAFUNCTIONS_H_
-    #include <alsa/asoundlib.h>
+#define ALSAFUNCTIONS_H_
+#include <alsa/asoundlib.h>
 
 /**
  * @brief Initialized an ALSA device and store some settings in de sa_device
@@ -975,8 +978,6 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             } else if(err == SA_STOP)
             { return SA_STOP; }
         }
-        if(readcount < device->period_size)
-        { return SA_AT_END; }
     }
     return SA_SUCCESS;
 }
