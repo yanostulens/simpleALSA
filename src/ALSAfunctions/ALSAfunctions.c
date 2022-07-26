@@ -441,8 +441,6 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
             } else if(err == SA_STOP)
             { return SA_STOP; }
         }
-        if(readcount < device->period_size)
-        { return SA_AT_END; }
     }
     return SA_SUCCESS;
 }

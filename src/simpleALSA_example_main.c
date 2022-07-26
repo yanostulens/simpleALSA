@@ -29,7 +29,7 @@ int data_callback(int frames_to_send, void *audio_buffer, sa_device *sa_device, 
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/afraid.wav";
+    char *infilename = "./audioFiles/big_dogs12.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
