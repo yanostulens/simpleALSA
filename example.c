@@ -32,15 +32,15 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
  * write a number of audioframes (equal to frames_to_send) to the audioBuffer.
  *
  * The most important thing about the callback
- * function is to return the amount of frames that have send to the audioBuffer!
- * Because when 0 is returned the sa_device will stop the callback loop, it is
- * then up to the user to restart the loop again.
+ * function is to RETURN THE AMOUNT OF FRAMES that have actually been written in the audio_buffer!
+ * Because when the data_callback returns exactly 0, the sa_device will stop the callback loop,
+ * at that moment, when the callback loop is stopped, the eof_callback() is called (explained below)
  *
  * Furthermore the user can use the my_custom_data pointer (which is set in the
  * config struct) in order to use custom data from within the callback loop.
  *
  * NOTE: do not call any API functions (such as sa_stop_device(),
- * sa_pause_device()...) from within the callback function as this will result
+ * sa_pause_device()...) from within the data_callback function as this will result
  * in undefined behaviour!
  */
 
@@ -49,7 +49,18 @@ int data_callback(int frames_to_send, void *audio_buffer, sa_device *device, voi
     return sf_readf_int(infile, audio_buffer, frames_to_send);
 }
 
+/**
+ * As explained earlier when the data_callback return 0 (indicating that no frames have been send to the
+ * audio_buffer), simpleALSA will automatically shutdown the callback loop. Right after the shut down process,
+ * a call is made to the eof_callback(), of which the signature is show below.
+ *
+ * From within the eof_callback one could take appropriate actions. In this example we repeat the same file
+ * by rewinding the .wav file and starting the device again.
+ *
+ * In contrast to the data_callback, in the eof_callback it is safe to call appropriate API functions.
+ */
 void eof_callback(sa_device *device, void *my_custom_data) {
+    printf("End of the file is reached - let's restart!");
     SNDFILE *infile = (SNDFILE *) my_custom_data;
     sf_seek(infile, 0, SEEK_SET);
     sa_start_device(device);
@@ -57,7 +68,7 @@ void eof_callback(sa_device *device, void *my_custom_data) {
 
 int main(int argc, char const *argv[]) {
     /** Init sndfile */
-    char *infilename = "yourFile.wav";
+    char *infilename = "./audioFiles/afraid.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
     initSndFile(infilename, &sfinfo, &infile);
@@ -82,6 +93,12 @@ int main(int argc, char const *argv[]) {
 
     /** After the configuration we can initialize the device */
     sa_init_device(config, &device);
+
+    /**
+     * NOTE: after initialization of the device it is not allowed to change any attributes from either the
+     * sa_device of sa_device_config struct!
+     * If you want to change for example the sampling_rate, you must destroy the device and init a new one.
+     */
 
     /** For demonstation purposes we start an endless loop that listens for
      * commands from stdin */
