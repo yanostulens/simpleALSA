@@ -1,5 +1,5 @@
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef SIMPLEALSACONFIG_H
+#define SIMPLEALSACONFIG_H
 
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
@@ -151,4 +151,4 @@ typedef struct
     struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-#endif /* _CONFIG_H_ */
+#endif // SIMPLEALSACONFIG_H
