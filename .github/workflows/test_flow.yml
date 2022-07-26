@@ -4,16 +4,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '14'
-      - run: apt-get update -y
-      - run: apt-get install -y libavformat-dev
-      - run: make pc
-  test:
-      runs-on: ubuntu-latest
-    steps:
-      - run: apt-get update -y
-      - run: apt-get install -y libavformat-dev
-      - run: make test
+      - name: checkout repo
+        uses: actions/checkout@v2
+      - name: make dir
+        run: mkdir build
+      - name: build application
+        run: make build
