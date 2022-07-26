@@ -45,14 +45,26 @@
  */
 typedef enum sa_result
 {
-    SA_ERROR   = -1,
-    SA_SUCCESS = 0,
-    SA_AT_END  = 1,
-    SA_STOP    = 2,
-    SA_PAUSE   = 3,
-    SA_UNPAUSE = 4,
+    SA_INVALID_STATE = -2,
+    SA_ERROR         = -1,
+    SA_SUCCESS       = 0,
+    SA_AT_END        = 1,
+    SA_STOP          = 2,
+    SA_PAUSE         = 3,
+    SA_UNPAUSE       = 4,
 
 } sa_result;
+
+/**
+ * @brief enum used to identify the state of a device
+ *
+ */
+typedef enum sa_device_state
+{
+    SA_DEVICE_STOPPED = 0,
+    SA_DEVICE_PAUSED  = 1,
+    SA_DEVICE_STARTED = 2,
+} sa_device_state;
 
 /** STRUCTS **/
 
@@ -65,6 +77,9 @@ typedef struct sa_device_config sa_device_config;
  */
 struct sa_device
 {
+    /** State of the device */
+    sa_device_state state;
+
     /** Pointer to the configuration settings of the device*/
     sa_device_config *config;
 
@@ -72,30 +87,28 @@ struct sa_device
     snd_pcm_t *handle;
 
     /** Pointer to the ALSA hardware parameters */
-    snd_pcm_hw_params_t *hwparams;
+    snd_pcm_hw_params_t *hw_params;
 
     /** Pointer to the ALSA hardware parameters */
-    snd_pcm_sw_params_t *swparams;
+    snd_pcm_sw_params_t *sw_params;
 
     /** Pointer to the place is memory where audio samples are written right before being send to the ALSA buffer */
     int *samples;
 
     /** Indicates support for the hardware to pause the pcm stream */
-    bool supportsPause;
+    bool supports_pause;
 
     /** TODO */
-    snd_pcm_sframes_t bufferSize;
+    snd_pcm_sframes_t buffer_size;
 
     /** TODO */
-    snd_pcm_sframes_t periodSize;
+    snd_pcm_sframes_t period_size;
 
     /** Refers to the pipe which can cancel poll when playback is canceled*/
     int pipe_write_end;
 
-    /** Some pointer to custom set data*/
-    void *myCustomData;
-
-    pthread_t playbackThread;
+    /** Reference to the playback thread */
+    pthread_t playback_thread;
 };
 
 /**
@@ -105,17 +118,17 @@ struct sa_device
 struct sa_device_config
 {
     /** Rate at which samples are send through the soundcard */
-    int sampleRate;
+    int sample_rate;
 
     /** Amount of desired audiochannels */
     int channels;
 
     /** Defines the size (in µs) of the internal ALSA ring buffer */
-    int bufferTime;
+    int buffer_time;
 
     /** Defines the time (in µs) after which ALSA will wake up to check if the buffer is running
             empty - increasing this time will increase efficiency, but risk the buffer running empty */
-    int periodTime;
+    int period_time;
 
     /** Format of the frames that are send to the ALSA buffer */
     snd_pcm_format_t format;
@@ -124,12 +137,16 @@ struct sa_device_config
                      audio - the default devices can be used by assigning this variable to "default" */
     char *device;
 
+    /** Some pointer to custom set data*/
+    void *my_custom_data;
+
     /** Callback function that will be called whenever the internal buffer is running
                                     empty and new audio samples are required */
-    int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData);
+    int (*data_callback)(int amount_of_frames, void *audio_buffer, sa_device *sa_device,
+                         void *my_custom_data);
 
     /** Callback function that will be called whenever the other callback function fails to provide more samples */
-    void (*eofCallback)(sa_device *sa_device, void *myCustomData);
+    void (*eof_callback)(sa_device *sa_device, void *my_custom_data);
 };
 
 /**

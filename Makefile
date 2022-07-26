@@ -9,7 +9,7 @@ OUTPUT := ./builds/simpleALSA.bin
 OUTPUT_DEBUG := ./builds/simpleALSA_debug.bin
 
 EXAMPLE_MAIN:= ./src/simpleALSA_example_main.c
-DEBUG_MAIN := ./src/experimental_mains/simpleALSA_example_main.c
+DEBUG_MAIN := ./src/simpleALSA_example_main.c
 FILES := ./src/ALSAfunctions/ALSAfunctions.c ./src/simpleALSA_API/simpleALSA.c ./src/logger/logger.c
 
 pc: $(FILES)
@@ -26,7 +26,7 @@ example: $(EXAMPLE_MAIN)
 
 debug: $(FILES)
 	mkdir -p builds
-	$(CC_PC) $(FILES) $(DEBUG_MAIN) $(OUT_PC) $(CFLAGS) $(DEBUG_FLAG) $(LIBS) -o $(OUTPUT_DEBUG) 
+	$(COMPILER) $(FILES) $(DEBUG_MAIN) $(OUT_PC) $(CFLAGS) $(DEBUG_FLAG) $(LIBS) -o $(OUTPUT_DEBUG) $(DEBUG)
 	gdb $(OUTPUT_DEBUG)
 
 run:
