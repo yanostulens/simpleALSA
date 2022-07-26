@@ -16,8 +16,9 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
 
 int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData) {
     SNDFILE *infile = (SNDFILE *) myCustomData;
-
-    return sf_readf_short(infile, sa_device->samples, framesToSend);
+    int readcount   = sf_readf_short(infile, sa_device->samples, framesToSend);
+    printf("%d\n", readcount);
+    return readcount;
 }
 
 int main(int argc, char const *argv[]) {
