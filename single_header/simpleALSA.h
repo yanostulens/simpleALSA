@@ -2,12 +2,74 @@
     #define SIMPLEALSA_H_
 
     #include <alsa/asoundlib.h>
-
-    #ifndef _CONFIG_H_
-#define _CONFIG_H_
+    #ifndef SIMPLEALSACONFIG_H
+#define SIMPLEALSACONFIG_H
 
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
+
+#ifndef SIMPLEALSALOGGER_H
+#define SIMPLEALSALOGGER_H
+
+#define SA_LOG_2_ARGS(type, msg0)        sa_log(type, msg0, "")
+#define SA_LOG_3_ARGS(type, msg0, msg1)  sa_log(type, msg0, msg1)
+
+#define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
+#define SA_LOG_MACRO_CHOOSER(...) \
+    GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, \
+                SA_LOG_2_ARGS, )
+
+#if defined SA_NO_LOGS
+    #define SA_LOG(...) ((void) 0)
+#else
+    #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+#endif
+
+/**
+ * @brief enum to identify different types of logs
+ *
+ */
+typedef enum
+{
+    DEBUG   = 0,
+    WARNING = 1,
+    ERROR   = 2
+} sa_log_type;
+
+void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
+
+#endif  // SIMPLEALSALOGGER_H
+
+/** MACROS **/
+
+#if !defined(DEFAULT_DEVICE)
+    #define DEFAULT_DEVICE "default"
+#endif
+
+#if !defined(DEFAULT_SAMPLE_RATE)
+    #define DEFAULT_SAMPLE_RATE 48000
+#endif
+
+#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+    #define DEFAULT_NUMBER_OF_CHANNELS 2
+#endif
+
+#if !defined(DEFAULT_AUDIO_FORMAT)
+    #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
+#endif
+
+#if !defined(DEFAULT_BUFFER_TIME)
+    #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
+#endif
+
+#if !defined(DEFAULT_PERIOD_TIME)
+    #define DEFAULT_PERIOD_TIME \
+        200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
+#endif
+
+#if !defined(SA_DEBUG)
+    #define SA_NO_DEBUG_LOGS
+#endif
 
 /** ENUMS **/
 
@@ -19,11 +81,15 @@ typedef enum sa_result
 {
     SA_ERROR   = -1,
     SA_SUCCESS = 0,
-    SA_CANCEL  = 1,
+    SA_AT_END  = 1,
+    SA_STOP    = 2,
+    SA_PAUSE   = 3,
+    SA_UNPAUSE = 4,
 
 } sa_result;
 
 /** STRUCTS **/
+
 typedef struct sa_device sa_device;
 typedef struct sa_device_config sa_device_config;
 
@@ -46,7 +112,7 @@ struct sa_device
     snd_pcm_sw_params_t *swparams;
 
     /** Pointer to the place is memory where audio samples are written right before being send to the ALSA buffer */
-    signed short *samples;
+    int *samples;
 
     /** Indicates support for the hardware to pause the pcm stream */
     bool supportsPause;
@@ -97,33 +163,29 @@ struct sa_device_config
     int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData);
 };
 
-#endif /* _CONFIG_H_ */
+/**
+ * @brief holds everything related to polling
+ */
+typedef struct
+{
+    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
+    struct pollfd *ufds;
+    /** The amount of file descriptors to poll */
+    int count;
+} sa_poll_management;
 
-/** MACROS **/
+/**
+ * @brief a struct with data to be passed to the playback thread
+ */
+typedef struct
+{
+    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
+    sa_device *device;
+    /** The read end of the pipe */
+    struct pollfd *pipe_read_end_fd;
+} sa_thread_data;
 
-    #if !defined(DEFAULT_DEVICE)
-        #define DEFAULT_DEVICE "default"
-    #endif
-
-    #if !defined(DEFAULT_SAMPLE_RATE)
-        #define DEFAULT_SAMPLE_RATE 48000
-    #endif
-
-    #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-        #define DEFAULT_NUMBER_OF_CHANNELS 2
-    #endif
-
-    #if !defined(DEFAULT_AUDIO_FORMAT)
-        #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-    #endif
-
-    #if !defined(DEFAULT_BUFFER_TIME)
-        #define DEFAULT_BUFFER_TIME 500000 /** in µS - so half a second here */
-    #endif
-
-    #if !defined(DEFAULT_PERIOD_TIME)
-        #define DEFAULT_PERIOD_TIME 250000 /** in µS - so quarter of a second here */
-    #endif
+#endif // SIMPLEALSACONFIG_H
 
 /** FUNCTIONS DEFINITIONS **/
 
@@ -175,36 +237,36 @@ sa_result sa_stop_device(sa_device *device);
 sa_result sa_destroy_device(sa_device *device);
 
 #endif  // SIMPLEALSA_H_
+#include <stdio.h>
+
+void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
+    switch(type)
+    {
+#ifndef SA_NO_ERROR_LOGS
+    case ERROR:
+        printf("\e[1;31m[  ERROR   ] \e[0m %s %s\n", msg0, msg1);
+        break;
+#endif
+#ifndef SA_NO_WARNING_LOGS
+    case WARNING:
+        printf("\e[1;33m[  WARNING ] \e[0m %s %s\n", msg0, msg1);
+        break;
+#endif
+#ifndef SA_NO_DEBUG_LOGS
+    case DEBUG:
+        printf("\e[1;35m[  DEBUG   ] \e[0m %s %s\n", msg0, msg1);
+        break;
+#endif
+    default:
+        break;
+    }
+    fflush(stdout);
+}
+
 
 #ifndef ALSAFUNCTIONS_H_
 #define ALSAFUNCTIONS_H_
 #include <alsa/asoundlib.h>
-
-/** STRUCTS */
-
-/**
- * @brief holds everything related to polling
- */
-typedef struct
-{
-    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
-    struct pollfd *ufds;
-    /** The amount of file descriptors to poll */
-    int count;
-} sa_poll_management;
-
-/**
- * @brief a struct with data to be passed to the playback thread
- */
-typedef struct
-{
-    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
-    sa_device *device;
-    /** The read end of the pipe */
-    struct pollfd *pipe_read_end_fd;
-} sa_thread_data;
-
-/** FUNCTIONS */
 
 /**
  * @brief Initialized an ALSA device and store some settings in de sa_device
@@ -269,7 +331,15 @@ sa_result unpause_alsa_device(sa_device *device);
 sa_result stop_alsa_device(sa_device *device);
 
 /**
- * @brief Drains the samples of the internal ALSA buffer
+ * @brief Drops the samples of the internal ALSA buffer and stop the ALSA pcm handle
+ *
+ * @param device
+ * @return sa_result
+ */
+sa_result drop_alsa_device(sa_device *device);
+
+/**
+ * @brief Drains the samples of the internal ALSA buffer and stops the ALSA pcm handle
  *
  * @param device
  * @return sa_result
@@ -365,7 +435,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 
 /**
  * @brief Checks whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
- * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_drain().
+ * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_prepare().
  *
  * @param device
  * @return sa_result
@@ -441,38 +511,6 @@ sa_result sa_destroy_device(sa_device *device) {
 }
 #include <pthread.h>
 
-#ifndef LOGGER_H
-#define LOGGER_H
-
-#define SA_LOG_2_ARGS(type, msg0)        sa_log(type, msg0, "")
-#define SA_LOG_3_ARGS(type, msg0, msg1)  sa_log(type, msg0, msg1)
-
-#define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
-#define SA_LOG_MACRO_CHOOSER(...) \
-    GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, \
-                SA_LOG_2_ARGS, )
-
-#if defined SA_NO_LOGS
-    #define SA_LOG(...) ((void) 0)
-#else
-    #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-#endif
-
-/**
- * @brief enum to identify different types of logs
- *
- */
-typedef enum
-{
-    DEBUG   = 0,
-    WARNING = 1,
-    ERROR   = 2
-} sa_log_type;
-
-void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
-
-#endif  // LOGGER_H
-
 sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hwparams));
@@ -495,7 +533,7 @@ sa_result init_alsa_device(sa_device *device) {
         exit(EXIT_FAILURE);
     }
 
-    device->samples = (signed short *) malloc((device->periodSize * device->config->channels *
+    device->samples = (int *) malloc((device->periodSize * device->config->channels *
                                                snd_pcm_format_physical_width(device->config->format)) /
                                               8);
 
@@ -721,14 +759,27 @@ void *init_playback_thread(void *data) {
                 {
                 /** Play command */
                 case 'u':
-                    if(start_write_and_poll_loop(device, pipe_read_end_fd) == SA_ERROR)
-                    { break; }
+                    sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
+                    /** The write and poll loop can end in three ways: error, a stop command is sent, or no more audio is send to the audiobuffer */
+                    if(res == SA_ERROR)
+                        break;
+                    if(res == SA_STOP)
+                    {
+                        drop_alsa_device(device);
+                        prepare_alsa_device(device);
+                    }
+                    if(res == SA_AT_END)
+                    {
+                        /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
+                        drain_alsa_device(device);
+                        prepare_alsa_device(device);
+                    }
                     continue;
                 /** Destroy command, no continue; break out of while */
                 case 'd':
                     break;
                 default:
-                    SA_LOG(WARNING, "Invalid command send to the pipe");
+                    SA_LOG(WARNING, "Command sent to the pipe is ignored");
                     continue;
                 }
                 SA_LOG(DEBUG, "Attempting to destroy the device");
@@ -742,19 +793,20 @@ void *init_playback_thread(void *data) {
 }
 
 sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd) {
+    sa_result result                 = SA_ERROR;
     sa_poll_management *poll_manager = NULL;
     /** Init the poll manager */
     if(init_poll_management(device, &poll_manager, pipe_read_end_fd) != SA_SUCCESS)
     {
         SA_LOG(ERROR, "Could not initialize the poll manager");
-        return SA_ERROR;
+        return result;
     }
-    write_and_poll_loop(device, poll_manager);
+    result = write_and_poll_loop(device, poll_manager);
     /** Cleanup */
     free(poll_manager->ufds);
     free(poll_manager);
     poll_manager = NULL;
-    return SA_SUCCESS;
+    return result;
 }
 
 sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
@@ -800,14 +852,16 @@ sa_result close_playback_thread(sa_device *device) {
 }
 
 sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
-    signed short *ptr;
+    int *ptr;
     int err, cptr, init, readcount;
-    init = 1;
+    readcount = 1;
+    init      = 1;
     while(1)
     {
         if(!init)
         {
             err = wait_for_poll(device, poll_manager);
+
             if(err < 0)
             {
                 if(snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ||
@@ -816,7 +870,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
-                        SA_LOG(ERROR, "Write error:", snd_strerror(err));
+                        SA_LOG(ERROR, "ALSA: Write error:", snd_strerror(err));
                         return SA_ERROR;
                     }
                     init = 1;
@@ -825,20 +879,22 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     SA_LOG(ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
-            } else if(err == SA_CANCEL)
-            { return SA_CANCEL; }
+            } else if(err == SA_STOP)
+            { return SA_STOP; }
         }
+        /** If the callback has not written any frames in the previous call- there are no frames left so we stop the callback loop */
+
         int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device,
-                                void *myCustomData) = (int (*)(int, void *,
-                                                               sa_device *, void* myCustomData)) device->config->callbackFunction;
+                                void *myCustomData) =
+          (int (*)(int, void *, sa_device *, void *myCustomData)) device->config->callbackFunction;
         readcount = callbackFunction(device->periodSize, device->samples, device, device->myCustomData);
 
-        /** If the callback has not written any frames - there are no frames left so we stop the callback loop */
-        if(!readcount)
-        { break; }
+        if(readcount == 0)
+        { return SA_AT_END; }
 
         ptr  = device->samples;
-        cptr = device->periodSize;
+        cptr = readcount;
+
         while(cptr > 0)
         {
             err = snd_pcm_writei(device->handle, ptr, cptr);
@@ -877,9 +933,11 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
                     SA_LOG(ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
-            } else if(err == SA_CANCEL)
-            { return SA_CANCEL; }
+            } else if(err == SA_STOP)
+            { return SA_STOP; }
         }
+        if(readcount < device->periodSize)
+        { return SA_AT_END; }
     }
     return SA_SUCCESS;
 }
@@ -903,17 +961,19 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 {
                 /** Stop playack */
                 case 's':
-                    drain_alsa_device(device);
-                    prepare_alsa_device(device);
-                    return SA_CANCEL;
+                    return SA_STOP;
                     break;
                 /** Pause playback */
                 case 'p':
-                    if(pause_callback_loop(poll_manager, device) == SA_CANCEL)
-                    { return SA_CANCEL; }
+                    sa_result res = pause_callback_loop(poll_manager, device);
+                    /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
+                    if(res == SA_STOP)
+                        return SA_STOP;
+                    if(res == SA_UNPAUSE)
+                        unpause_PCM_handle(device);
                     break;
                 default:
-                    SA_LOG(WARNING, "Invalid command send to pipe");
+                    SA_LOG(WARNING, "Command send to the pipe is ignored");
                     break;
                 }
             }
@@ -948,14 +1008,11 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
             {
             /** Stop playback */
             case 's':
-                drain_alsa_device(device);
-                prepare_alsa_device(device);
-                return SA_CANCEL;
+                return SA_STOP;
                 break;
             /** Unpause */
             case 'u':
-                unpause_PCM_handle(device);
-                return SA_SUCCESS;
+                return SA_UNPAUSE;
                 break;
             default:
                 break;
@@ -966,12 +1023,13 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
 }
 
 sa_result xrun_recovery(snd_pcm_t *handle, int err) {
+    SA_LOG(DEBUG, "ASLA: xrun occured");
     if(err == -EPIPE)
     { /* Underrun */
         err = snd_pcm_prepare(handle);
         if(err < 0)
         {
-            SA_LOG(ERROR, "Can't recover from underrun, prepare failed:", snd_strerror(err));
+            SA_LOG(ERROR, "ALSA: Can't recover from underrun, prepare failed:", snd_strerror(err));
             return SA_ERROR;
         }
     } else if(err == -ESTRPIPE)
@@ -986,7 +1044,7 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
             err = snd_pcm_prepare(handle);
             if(err < 0)
             {
-                SA_LOG(ERROR, "Can't recover from suspend, prepare failed:", snd_strerror(err));
+                SA_LOG(ERROR, "ALSA: Can't recover from suspend, prepare failed:", snd_strerror(err));
                 return SA_ERROR;
             }
         }
@@ -1020,7 +1078,6 @@ sa_result stop_alsa_device(sa_device *device) {
         return SA_ERROR;
     };
     return SA_SUCCESS;
-    // TODO CLEANUP
 }
 
 sa_result pause_PCM_handle(sa_device *device) {
@@ -1028,13 +1085,13 @@ sa_result pause_PCM_handle(sa_device *device) {
     {
         if(snd_pcm_pause(device->handle, 1) != 0)
         {
-            SA_LOG(ERROR, "Failed to snd_pcm_pause the pcm handle (when pausing)");
+            SA_LOG(ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when pausing)");
             return SA_ERROR;
         }
         return SA_SUCCESS;
     } else
     {
-        if(drain_alsa_device(device) == SA_SUCCESS && prepare_alsa_device(device) == SA_SUCCESS)
+        if(drop_alsa_device(device) == SA_SUCCESS && prepare_alsa_device(device) == SA_SUCCESS)
             return SA_SUCCESS;
     }
     return SA_ERROR;
@@ -1045,24 +1102,49 @@ sa_result unpause_PCM_handle(sa_device *device) {
     {
         if(snd_pcm_pause(device->handle, 0) != 0)
         {
-            SA_LOG(ERROR, "Failed to snd_pcm_pause the pcm handle (when resuming)");
+            SA_LOG(ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when resuming)");
             return SA_ERROR;
         }
     }
     return SA_SUCCESS;
 }
 
+sa_result drop_alsa_device(sa_device *device) {
+    SA_LOG(DEBUG, "ALSA drop called");
+    int err = 0;
+    if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
+                          snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED))
+    {
+        err = snd_pcm_drop(device->handle);
+        if(err == 0)
+        {
+            return SA_SUCCESS;
+        } else
+        { SA_LOG(ERROR, "ALSA: snd_pcm_drop() failed: ", snd_strerror(err)); }
+    }
+    SA_LOG(ERROR, "Failed to drop samples from the ALSA device: pcm_hanlde not in runnning or paused state");
+    exit(EXIT_FAILURE);
+}
+
 sa_result drain_alsa_device(sa_device *device) {
-    if(device->handle &&
-       (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
-        snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED) &&
-       snd_pcm_drop(device->handle) == 0)
-    { return SA_SUCCESS; }
-    SA_LOG(ERROR, "Failed to drop samples from the ALSA device");
+    SA_LOG(DEBUG, "ALSA drain called");
+    int err = 0;
+    if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
+                          snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED))
+    {
+        err = snd_pcm_drain(device->handle);
+        if(err == 0)
+        {
+            return SA_SUCCESS;
+        } else
+        { SA_LOG(ERROR, "ALSA: snd_pcm_drain() failed: ", snd_strerror(err)); }
+    }
+    SA_LOG(ERROR, "Failed to drain samples from the ALSA device: pcm_handle not in runnning or paused state");
     exit(EXIT_FAILURE);
 }
 
 sa_result prepare_alsa_device(sa_device *device) {
+    SA_LOG(DEBUG, "ALSA prepare called");
     if(device->handle && snd_pcm_prepare(device->handle) == 0)
     { return SA_SUCCESS; }
     SA_LOG(ERROR, "Failed to prepare the ALSA device");
@@ -1110,29 +1192,4 @@ sa_result destroy_alsa_device(sa_device *device) {
         exit(EXIT_FAILURE);
     }
     return cleanup_device(device);
-}
-#include <stdio.h>
-
-void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
-    switch(type)
-    {
-#ifndef SA_NO_ERROR_LOGS
-    case ERROR:
-        printf("\e[1;31m[  ERROR   ] \e[0m %s %s\n", msg0, msg1);
-        break;
-#endif
-#ifndef SA_NO_WARNING_LOGS
-    case WARNING:
-        printf("\e[1;33m[  WARNING ] \e[0m %s %s\n", msg0, msg1);
-        break;
-#endif
-#ifndef SA_NO_DEBUG_LOGS
-    case DEBUG:
-        printf("\e[1;35m[  DEBUG   ] \e[0m %s %s\n", msg0, msg1);
-        break;
-#endif
-    default:
-        break;
-    }
-    fflush(stdout);
 }

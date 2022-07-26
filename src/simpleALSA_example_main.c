@@ -1,6 +1,7 @@
 #include <sndfile.h>
 #include <stdio.h>
 
+#include "./ALSAfunctions/ALSAfunctions.h"
 #include "./logger/logger.h"
 #include "./simpleALSA_API/simpleALSA.h"
 
@@ -22,7 +23,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/big_dogs.wav";
+    char *infilename = "./audioFiles/afraid.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -34,6 +35,8 @@ int main(int argc, char const *argv[]) {
     config->callbackFunction = &callback_function;
     config->sampleRate       = sfinfo.samplerate;
     config->channels         = sfinfo.channels;
+    /** We set the format to 32 bits here because libsndfile reads out frames (see callback_function) as integers in 32 bit words */
+    config->format           = SND_PCM_FORMAT_S32_LE;
 
     sa_init_device(config, &device);
     device->myCustomData = (void *) infile;
@@ -41,24 +44,28 @@ int main(int argc, char const *argv[]) {
     {
         printf("Give a command please...\n");
         char input[20];
-        fgets(input, 20, stdin);
-
-        if(strcmp(input, "play\n") == 0)
+        if(fgets(input, 20, stdin))
         {
-            sa_start_device(device);
-        } else if(strcmp(input, "pause\n") == 0)
-        {
-            sa_pause_device(device);
-        } else if(strcmp(input, "stop\n") == 0)
-        {
-            sa_stop_device(device);
-            sf_seek(infile, 0, SEEK_SET);
-        } else if(strcmp(input, "destroy\n") == 0)
-        {
-            sa_destroy_device(device);
-            break;
-        } else if(strcmp(input, "rewind\n") == 0)
-        { sf_seek(infile, 0, SEEK_SET); }
+            if(strcmp(input, "play\n") == 0)
+            {
+                sa_start_device(device);
+            } else if(strcmp(input, "pause\n") == 0)
+            {
+                sa_pause_device(device);
+            } else if(strcmp(input, "stop\n") == 0)
+            {
+                sa_stop_device(device);
+                sf_seek(infile, 0, SEEK_SET);
+            } else if(strcmp(input, "prep\n") == 0)
+            {
+                prepare_alsa_device(device);
+            } else if(strcmp(input, "destroy\n") == 0)
+            {
+                sa_destroy_device(device);
+                break;
+            } else if(strcmp(input, "rewind\n") == 0)
+            { sf_seek(infile, 0, SEEK_SET); }
+        }
     }
     sf_close(infile);
     return 0;

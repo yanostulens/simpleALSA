@@ -3,6 +3,7 @@ CFLAGS := -Wall
 OPTIMIZATION := -O2
 DEBUG_FLAG := -g
 LIBS := -lasound -lm -lsndfile -lpthread
+DEBUG := -DSA_DEBUG
 
 OUTPUT := ./builds/simpleALSA.bin
 OUTPUT_DEBUG := ./builds/simpleALSA_debug.bin
@@ -13,7 +14,7 @@ FILES := ./src/ALSAfunctions/ALSAfunctions.c ./src/simpleALSA_API/simpleALSA.c .
 
 pc: $(FILES)
 	mkdir -p builds
-	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
+	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
 
 pc_s:
 	mkdir -p builds

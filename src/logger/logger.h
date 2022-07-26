@@ -1,5 +1,5 @@
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef SIMPLEALSALOGGER_H
+#define SIMPLEALSALOGGER_H
 
 #include "../config.h"
 
@@ -30,4 +30,4 @@ typedef enum
 
 void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
-#endif  // LOGGER_H
+#endif  // SIMPLEALSALOGGER_H

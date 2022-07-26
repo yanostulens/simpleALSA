@@ -5,32 +5,6 @@
 #include "../config.h"
 #include "../simpleALSA_API/simpleALSA.h"
 
-/** STRUCTS */
-
-/**
- * @brief holds everything related to polling
- */
-typedef struct
-{
-    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
-    struct pollfd *ufds;
-    /** The amount of file descriptors to poll */
-    int count;
-} sa_poll_management;
-
-/**
- * @brief a struct with data to be passed to the playback thread
- */
-typedef struct
-{
-    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
-    sa_device *device;
-    /** The read end of the pipe */
-    struct pollfd *pipe_read_end_fd;
-} sa_thread_data;
-
-/** FUNCTIONS */
-
 /**
  * @brief Initialized an ALSA device and store some settings in de sa_device
  *

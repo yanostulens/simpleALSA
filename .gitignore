@@ -1,4 +1,4 @@
-./builds
-./audioFiles
-./.vscode
+builds/
+audioFiles/
+.vscode/
 

@@ -1,8 +1,41 @@
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef SIMPLEALSACONFIG_H
+#define SIMPLEALSACONFIG_H
 
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
+
+#include "logger/logger.h"
+
+/** MACROS **/
+
+#if !defined(DEFAULT_DEVICE)
+    #define DEFAULT_DEVICE "default"
+#endif
+
+#if !defined(DEFAULT_SAMPLE_RATE)
+    #define DEFAULT_SAMPLE_RATE 48000
+#endif
+
+#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+    #define DEFAULT_NUMBER_OF_CHANNELS 2
+#endif
+
+#if !defined(DEFAULT_AUDIO_FORMAT)
+    #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
+#endif
+
+#if !defined(DEFAULT_BUFFER_TIME)
+    #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
+#endif
+
+#if !defined(DEFAULT_PERIOD_TIME)
+    #define DEFAULT_PERIOD_TIME \
+        200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
+#endif
+
+#if !defined(SA_DEBUG)
+    #define SA_NO_DEBUG_LOGS
+#endif
 
 /** ENUMS **/
 
@@ -14,11 +47,15 @@ typedef enum sa_result
 {
     SA_ERROR   = -1,
     SA_SUCCESS = 0,
-    SA_CANCEL  = 1,
+    SA_AT_END  = 1,
+    SA_STOP    = 2,
+    SA_PAUSE   = 3,
+    SA_UNPAUSE = 4,
 
 } sa_result;
 
 /** STRUCTS **/
+
 typedef struct sa_device sa_device;
 typedef struct sa_device_config sa_device_config;
 
@@ -41,7 +78,7 @@ struct sa_device
     snd_pcm_sw_params_t *swparams;
 
     /** Pointer to the place is memory where audio samples are written right before being send to the ALSA buffer */
-    signed short *samples;
+    int *samples;
 
     /** Indicates support for the hardware to pause the pcm stream */
     bool supportsPause;
@@ -92,4 +129,26 @@ struct sa_device_config
     int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData);
 };
 
-#endif /* _CONFIG_H_ */
+/**
+ * @brief holds everything related to polling
+ */
+typedef struct
+{
+    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
+    struct pollfd *ufds;
+    /** The amount of file descriptors to poll */
+    int count;
+} sa_poll_management;
+
+/**
+ * @brief a struct with data to be passed to the playback thread
+ */
+typedef struct
+{
+    /** An array of file descriptors to poll, ufds[0] is the read end of the pipe */
+    sa_device *device;
+    /** The read end of the pipe */
+    struct pollfd *pipe_read_end_fd;
+} sa_thread_data;
+
+#endif // SIMPLEALSACONFIG_H
