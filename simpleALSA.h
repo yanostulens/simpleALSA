@@ -15,14 +15,14 @@
 #define SIMPLEALSA_H_
 
 #include <alsa/asoundlib.h>
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef SIMPLEALSACONFIG_H
+#define SIMPLEALSACONFIG_H
 
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef SIMPLEALSALOGGER_H
+#define SIMPLEALSALOGGER_H
 
 #define SA_LOG_2_ARGS(type, msg0) sa_log(type, msg0, "")
 #define SA_LOG_3_ARGS(type, msg0, msg1) sa_log(type, msg0, msg1)
@@ -45,7 +45,7 @@ typedef enum { DEBUG = 0, WARNING = 1, ERROR = 2 } sa_log_type;
 
 void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
-#endif // LOGGER_H
+#endif // SIMPLEALSALOGGER_H
 
 /** MACROS **/
 
@@ -86,6 +86,7 @@ void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
  *
  */
 typedef enum sa_result {
+  SA_INVALID_STATE = -2,
   SA_ERROR = -1,
   SA_SUCCESS = 0,
   SA_AT_END = 1,
@@ -94,6 +95,16 @@ typedef enum sa_result {
   SA_UNPAUSE = 4,
 
 } sa_result;
+
+/**
+ * @brief enum used to identify the state of a device
+ *
+ */
+typedef enum sa_device_state {
+  SA_DEVICE_STOPPED = 0,
+  SA_DEVICE_PAUSED = 1,
+  SA_DEVICE_STARTED = 2,
+} sa_device_state;
 
 /** STRUCTS **/
 
@@ -105,6 +116,9 @@ typedef struct sa_device_config sa_device_config;
  *
  */
 struct sa_device {
+  /** State of the device */
+  sa_device_state state;
+
   /** Pointer to the configuration settings of the device*/
   sa_device_config *config;
 
@@ -112,31 +126,29 @@ struct sa_device {
   snd_pcm_t *handle;
 
   /** Pointer to the ALSA hardware parameters */
-  snd_pcm_hw_params_t *hwparams;
+  snd_pcm_hw_params_t *hw_params;
 
   /** Pointer to the ALSA hardware parameters */
-  snd_pcm_sw_params_t *swparams;
+  snd_pcm_sw_params_t *sw_params;
 
   /** Pointer to the place is memory where audio samples are written right
    * before being send to the ALSA buffer */
   int *samples;
 
   /** Indicates support for the hardware to pause the pcm stream */
-  bool supportsPause;
+  bool supports_pause;
 
   /** TODO */
-  snd_pcm_sframes_t bufferSize;
+  snd_pcm_sframes_t buffer_size;
 
   /** TODO */
-  snd_pcm_sframes_t periodSize;
+  snd_pcm_sframes_t period_size;
 
   /** Refers to the pipe which can cancel poll when playback is canceled*/
   int pipe_write_end;
 
-  /** Some pointer to custom set data*/
-  void *myCustomData;
-
-  pthread_t playbackThread;
+  /** Reference to the playback thread */
+  pthread_t playback_thread;
 };
 
 /**
@@ -145,18 +157,18 @@ struct sa_device {
  */
 struct sa_device_config {
   /** Rate at which samples are send through the soundcard */
-  int sampleRate;
+  int sample_rate;
 
   /** Amount of desired audiochannels */
   int channels;
 
   /** Defines the size (in µs) of the internal ALSA ring buffer */
-  int bufferTime;
+  int buffer_time;
 
   /** Defines the time (in µs) after which ALSA will wake up to check if the
      buffer is running empty - increasing this time will increase efficiency,
      but risk the buffer running empty */
-  int periodTime;
+  int period_time;
 
   /** Format of the frames that are send to the ALSA buffer */
   snd_pcm_format_t format;
@@ -166,10 +178,17 @@ struct sa_device_config {
      variable to "default" */
   char *device;
 
+  /** Some pointer to custom set data*/
+  void *my_custom_data;
+
   /** Callback function that will be called whenever the internal buffer is
      running empty and new audio samples are required */
-  int (*callbackFunction)(int framesToSend, void *audioBuffer,
-                          sa_device *sa_device, void *myCustomData);
+  int (*data_callback)(int amount_of_frames, void *audio_buffer,
+                       sa_device *sa_device, void *my_custom_data);
+
+  /** Callback function that will be called whenever the other callback function
+   * fails to provide more samples */
+  void (*eof_callback)(sa_device *sa_device, void *my_custom_data);
 };
 
 /**
@@ -194,7 +213,7 @@ typedef struct {
   struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-#endif /* _CONFIG_H_ */
+#endif // SIMPLEALSACONFIG_H
 
 /** FUNCTIONS DEFINITIONS **/
 
@@ -493,13 +512,13 @@ sa_result sa_init_device_config(sa_device_config **config) {
   if (!config_temp)
     return SA_ERROR;
 
-  config_temp->sampleRate = DEFAULT_SAMPLE_RATE;
+  config_temp->sample_rate = DEFAULT_SAMPLE_RATE;
   config_temp->channels = DEFAULT_NUMBER_OF_CHANNELS;
-  config_temp->bufferTime = DEFAULT_BUFFER_TIME;
-  config_temp->periodTime = DEFAULT_PERIOD_TIME;
+  config_temp->buffer_time = DEFAULT_BUFFER_TIME;
+  config_temp->period_time = DEFAULT_PERIOD_TIME;
   config_temp->format = DEFAULT_AUDIO_FORMAT;
   config_temp->device = "default";
-  config_temp->callbackFunction = NULL;
+  config_temp->data_callback = NULL;
   *config = config_temp;
   return SA_SUCCESS;
 }
@@ -510,18 +529,30 @@ sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     return SA_ERROR;
 
   device_temp->config = config;
+  device_temp->state = SA_DEVICE_STOPPED;
   *device = device_temp;
   return init_alsa_device(*device);
 }
 
 sa_result sa_start_device(sa_device *device) {
-  return start_alsa_device(device);
+  if (device->state != SA_DEVICE_STARTED)
+    return start_alsa_device(device);
+  else
+    return SA_INVALID_STATE;
 }
 
-sa_result sa_stop_device(sa_device *device) { return stop_alsa_device(device); }
+sa_result sa_stop_device(sa_device *device) {
+  if (device->state != SA_DEVICE_STOPPED)
+    return stop_alsa_device(device);
+  else
+    return SA_INVALID_STATE;
+}
 
 sa_result sa_pause_device(sa_device *device) {
-  return pause_alsa_device(device);
+  if (device->state == SA_DEVICE_STARTED)
+    return pause_alsa_device(device);
+  else
+    return SA_INVALID_STATE;
 }
 
 sa_result sa_destroy_device(sa_device *device) {
@@ -531,8 +562,8 @@ sa_result sa_destroy_device(sa_device *device) {
 
 sa_result init_alsa_device(sa_device *device) {
   int err;
-  snd_pcm_hw_params_alloca(&(device->hwparams));
-  snd_pcm_sw_params_alloca(&(device->swparams));
+  snd_pcm_hw_params_alloca(&(device->hw_params));
+  snd_pcm_sw_params_alloca(&(device->sw_params));
 
   if ((err = snd_pcm_open(&(device->handle), device->config->device,
                           SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
@@ -553,7 +584,7 @@ sa_result init_alsa_device(sa_device *device) {
   }
 
   device->samples =
-      (int *)malloc((device->periodSize * device->config->channels *
+      (int *)malloc((device->period_size * device->config->channels *
                      snd_pcm_format_physical_width(device->config->format)) /
                     8);
 
@@ -561,8 +592,8 @@ sa_result init_alsa_device(sa_device *device) {
     exit(EXIT_FAILURE);
   }
 
-  device->supportsPause = snd_pcm_hw_params_can_pause(device->hwparams);
-  if (device->supportsPause) {
+  device->supports_pause = snd_pcm_hw_params_can_pause(device->hw_params);
+  if (device->supports_pause) {
     SA_LOG(DEBUG, "Device supports snd_pcm_pause()");
   } else {
     SA_LOG(DEBUG, "Device does not support snd_pcm_pause()");
@@ -580,7 +611,7 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
   snd_pcm_uframes_t size;
   int err, dir;
 
-  err = snd_pcm_hw_params_any(device->handle, device->hwparams);
+  err = snd_pcm_hw_params_any(device->handle, device->hw_params);
   if (err < 0) {
     SA_LOG(
         ERROR,
@@ -588,23 +619,23 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
         snd_strerror(err));
     return SA_ERROR;
   }
-  /** Set the samplerate */
+  /** Set the sample_rate */
   err =
-      snd_pcm_hw_params_set_rate_resample(device->handle, device->hwparams, 1);
+      snd_pcm_hw_params_set_rate_resample(device->handle, device->hw_params, 1);
   if (err < 0) {
     SA_LOG(ERROR,
            "ALSA: resampling setup failed for playback:", snd_strerror(err));
     return SA_ERROR;
   }
   /* Set the interleaved read/write format */
-  err = snd_pcm_hw_params_set_access(device->handle, device->hwparams, access);
+  err = snd_pcm_hw_params_set_access(device->handle, device->hw_params, access);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: access type not available for playback",
            snd_strerror(err));
     return SA_ERROR;
   }
   /* Set the sample format */
-  err = snd_pcm_hw_params_set_format(device->handle, device->hwparams,
+  err = snd_pcm_hw_params_set_format(device->handle, device->hw_params,
                                      device->config->format);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: sample format not available for playback:",
@@ -612,7 +643,7 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     return SA_ERROR;
   }
   /* Set the count of channels */
-  err = snd_pcm_hw_params_set_channels(device->handle, device->hwparams,
+  err = snd_pcm_hw_params_set_channels(device->handle, device->hw_params,
                                        device->config->channels);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: channels count not available for playback",
@@ -620,52 +651,52 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     return SA_ERROR;
   }
   /* Set the stream rate */
-  rrate = device->config->sampleRate;
-  err = snd_pcm_hw_params_set_rate_near(device->handle, device->hwparams,
+  rrate = device->config->sample_rate;
+  err = snd_pcm_hw_params_set_rate_near(device->handle, device->hw_params,
                                         &rrate, 0);
   if (err < 0) {
-    SA_LOG(ERROR, "ALSA: samplerate not available for playback",
+    SA_LOG(ERROR, "ALSA: sample_rate not available for playback",
            snd_strerror(err));
     return SA_ERROR;
   }
-  if (rrate != device->config->sampleRate) {
+  if (rrate != device->config->sample_rate) {
     SA_LOG(ERROR, "ALSA: sample rate does not match the requested rate");
     return SA_ERROR;
   }
   /* Set the buffer time */
   err = snd_pcm_hw_params_set_buffer_time_near(
-      device->handle, device->hwparams,
-      (unsigned int *)&(device->config->bufferTime), &dir);
+      device->handle, device->hw_params,
+      (unsigned int *)&(device->config->buffer_time), &dir);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to set the buffer time for playback:",
            snd_strerror(err));
     return SA_ERROR;
   }
-  err = snd_pcm_hw_params_get_buffer_size(device->hwparams, &size);
+  err = snd_pcm_hw_params_get_buffer_size(device->hw_params, &size);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to get the buffer size for playback:",
            snd_strerror(err));
     return SA_ERROR;
   }
-  device->bufferSize = size;
+  device->buffer_size = size;
   /* Set the period time */
   err = snd_pcm_hw_params_set_period_time_near(
-      device->handle, device->hwparams,
-      (unsigned int *)&(device->config->periodTime), &dir);
+      device->handle, device->hw_params,
+      (unsigned int *)&(device->config->period_time), &dir);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to set the period time for playback:",
            snd_strerror(err));
     return SA_ERROR;
   }
-  err = snd_pcm_hw_params_get_period_size(device->hwparams, &size, &dir);
+  err = snd_pcm_hw_params_get_period_size(device->hw_params, &size, &dir);
   if (err < 0) {
     SA_LOG(ERROR,
            "ALSA: unable to get period size for playback:", snd_strerror(err));
     return SA_ERROR;
   }
-  device->periodSize = size;
+  device->period_size = size;
   /* Write the parameters to device */
-  err = snd_pcm_hw_params(device->handle, device->hwparams);
+  err = snd_pcm_hw_params(device->handle, device->hw_params);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to set hardware parameters for playback:",
            snd_strerror(err));
@@ -677,8 +708,8 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
 sa_result set_software_parameters(sa_device *device) {
   int err;
 
-  /* Get the current swparams */
-  err = snd_pcm_sw_params_current(device->handle, device->swparams);
+  /* Get the current sw_params */
+  err = snd_pcm_sw_params_current(device->handle, device->sw_params);
   if (err < 0) {
     SA_LOG(
         ERROR,
@@ -689,8 +720,8 @@ sa_result set_software_parameters(sa_device *device) {
   /* Start the transfer when the buffer is almost full: (buffer_size /
    * avail_min) * avail_min */
   err = snd_pcm_sw_params_set_start_threshold(
-      device->handle, device->swparams,
-      (device->bufferSize / device->periodSize) * device->periodSize);
+      device->handle, device->sw_params,
+      (device->buffer_size / device->period_size) * device->period_size);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to start set threshold mode for playback",
            snd_strerror(err));
@@ -699,9 +730,9 @@ sa_result set_software_parameters(sa_device *device) {
   /* Allow the transfer when at least period_size samples can be processed */
   /* or disable this mechanism when period event is enabled (aka interrupt like
    * style processing) */
-  err = snd_pcm_sw_params_set_avail_min(device->handle, device->swparams,
-                                        0 ? device->bufferSize
-                                          : device->periodSize);
+  err = snd_pcm_sw_params_set_avail_min(device->handle, device->sw_params,
+                                        0 ? device->buffer_size
+                                          : device->period_size);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to set available minimum for playback",
            snd_strerror(err));
@@ -709,15 +740,15 @@ sa_result set_software_parameters(sa_device *device) {
   }
   /* Enable period events when requested */
   if (0) {
-    err =
-        snd_pcm_sw_params_set_period_event(device->handle, device->swparams, 1);
+    err = snd_pcm_sw_params_set_period_event(device->handle, device->sw_params,
+                                             1);
     if (err < 0) {
       SA_LOG(ERROR, "ALSA: unable to set period event", snd_strerror(err));
       return SA_ERROR;
     }
   }
   /* Write the parameters to the playback device */
-  err = snd_pcm_sw_params(device->handle, device->swparams);
+  err = snd_pcm_sw_params(device->handle, device->sw_params);
   if (err < 0) {
     SA_LOG(ERROR, "ALSA: unable to set software parameters for playback",
            snd_strerror(err));
@@ -750,7 +781,7 @@ sa_result prepare_playback_thread(sa_device *device) {
   sa_thread_data *thread_data = malloc(sizeof(sa_thread_data));
   thread_data->device = device;
   thread_data->pipe_read_end_fd = pipe_read_end_fd;
-  if (pthread_create(&device->playbackThread, NULL, &init_playback_thread,
+  if (pthread_create(&device->playback_thread, NULL, &init_playback_thread,
                      (void *)thread_data) != 0) {
     SA_LOG(ERROR, "Failed to create the playback thread");
     return SA_ERROR;
@@ -782,20 +813,30 @@ void *init_playback_thread(void *data) {
         switch (command) {
         /** Play command */
         case 'u':
+          device->state = SA_DEVICE_STARTED;
           sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
           /** The write and poll loop can end in three ways: error, a stop
            * command is sent, or no more audio is send to the audiobuffer */
-          if (res == SA_ERROR)
+          if (res == SA_ERROR) {
+            device->state = SA_DEVICE_STOPPED;
             break;
+          }
           if (res == SA_STOP) {
             drop_alsa_device(device);
             prepare_alsa_device(device);
+            device->state = SA_DEVICE_STOPPED;
           }
           if (res == SA_AT_END) {
             /** Received no frames anymore from the callback so we stop and
              * prepare the alsa device again */
             drain_alsa_device(device);
             prepare_alsa_device(device);
+            device->state = SA_DEVICE_STOPPED;
+            /** Signal eof */
+            void (*eof_callback)(sa_device * sa_device, void *my_custom_data) =
+                (void (*)(sa_device *,
+                          void *my_custom_data))device->config->eof_callback;
+            eof_callback(device, device->config->my_custom_data);
           }
           continue;
         /** Destroy command, no continue; break out of while */
@@ -869,7 +910,7 @@ sa_result init_poll_management(sa_device *device,
 }
 
 sa_result close_playback_thread(sa_device *device) {
-  if (pthread_join(device->playbackThread, NULL) != 0) {
+  if (pthread_join(device->playback_thread, NULL) != 0) {
     SA_LOG(ERROR, "Could not join playback thread");
     return SA_ERROR;
   }
@@ -907,12 +948,12 @@ sa_result write_and_poll_loop(sa_device *device,
     /** If the callback has not written any frames in the previous call- there
      * are no frames left so we stop the callback loop */
 
-    int (*callbackFunction)(int framesToSend, void *audioBuffer,
-                            sa_device *sa_device, void *myCustomData) =
+    int (*data_callback)(int framesToSend, void *audioBuffer,
+                         sa_device *sa_device, void *my_custom_data) =
         (int (*)(int, void *, sa_device *,
-                 void *myCustomData))device->config->callbackFunction;
-    readcount = callbackFunction(device->periodSize, device->samples, device,
-                                 device->myCustomData);
+                 void *my_custom_data))device->config->data_callback;
+    readcount = data_callback(device->period_size, device->samples, device,
+                              device->config->my_custom_data);
 
     if (readcount == 0) {
       return SA_AT_END;
@@ -958,7 +999,7 @@ sa_result write_and_poll_loop(sa_device *device,
         return SA_STOP;
       }
     }
-    if (readcount < device->periodSize) {
+    if (readcount < device->period_size) {
       return SA_AT_END;
     }
   }
@@ -984,6 +1025,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
           break;
         /** Pause playback */
         case 'p':
+          device->state = SA_DEVICE_PAUSED;
           sa_result res = pause_callback_loop(poll_manager, device);
           /** The 'paused' state can end in 2 ways: either a stop command kills
            * the device or an unpause command resumes playback */
@@ -991,6 +1033,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
             return SA_STOP;
           if (res == SA_UNPAUSE)
             unpause_PCM_handle(device);
+          device->state = SA_DEVICE_STARTED;
           break;
         default:
           SA_LOG(WARNING, "Command send to the pipe is ignored");
@@ -1024,10 +1067,12 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager,
       switch (command) {
       /** Stop playback */
       case 's':
+        device->state = SA_DEVICE_STOPPED;
         return SA_STOP;
         break;
       /** Unpause */
       case 'u':
+        device->state = SA_DEVICE_STARTED;
         return SA_UNPAUSE;
         break;
       default:
@@ -1090,7 +1135,7 @@ sa_result stop_alsa_device(sa_device *device) {
 }
 
 sa_result pause_PCM_handle(sa_device *device) {
-  if (device->supportsPause) {
+  if (device->supports_pause) {
     if (snd_pcm_pause(device->handle, 1) != 0) {
       SA_LOG(ERROR,
              "ALSA: Failed to snd_pcm_pause the pcm handle (when pausing)");
@@ -1106,7 +1151,7 @@ sa_result pause_PCM_handle(sa_device *device) {
 }
 
 sa_result unpause_PCM_handle(sa_device *device) {
-  if (device->supportsPause) {
+  if (device->supports_pause) {
     if (snd_pcm_pause(device->handle, 0) != 0) {
       SA_LOG(ERROR,
              "ALSA: Failed to snd_pcm_pause the pcm handle (when resuming)");

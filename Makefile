@@ -7,7 +7,7 @@ OUTPUT := ./builds/simpleALSA.bin
 
 MAIN:= ./example.c
 
-main: $(FILES)
+pc: $(FILES)
 	mkdir -p builds
 	$(COMPILER) $(MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
 
