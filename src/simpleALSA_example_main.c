@@ -15,6 +15,13 @@ void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     *infile = infile_temp;
 }
 
+void eof_callback(sa_device *sa_device, void *myCustomData) {
+    /** restart file (or signal that playback has ended to main thread) */
+    SNDFILE *infile = (SNDFILE *) myCustomData;
+    sf_seek(infile, 0, SEEK_SET);
+    sa_start_device(sa_device);
+}
+
 int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData) {
     SNDFILE *infile = (SNDFILE *) myCustomData;
     int readcount   = sf_readf_short(infile, sa_device->samples, framesToSend);
@@ -23,7 +30,7 @@ int callback_function(int framesToSend, void *audioBuffer, sa_device *sa_device,
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = "./audioFiles/afraid.wav";
+    char *infilename = "./audioFiles/big_dogs.wav";
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 
@@ -33,10 +40,11 @@ int main(int argc, char const *argv[]) {
 
     initSndFile(infilename, &sfinfo, &infile);
     config->callbackFunction = &callback_function;
+    config->eofCallback      = &eof_callback;
     config->sampleRate       = sfinfo.samplerate;
     config->channels         = sfinfo.channels;
     /** We set the format to 32 bits here because libsndfile reads out frames (see callback_function) as integers in 32 bit words */
-    config->format           = SND_PCM_FORMAT_S32_LE;
+    // config->format           = SND_PCM_FORMAT_S32_LE;
 
     sa_init_device(config, &device);
     device->myCustomData = (void *) infile;

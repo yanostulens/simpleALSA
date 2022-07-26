@@ -27,8 +27,8 @@ sa_result init_alsa_device(sa_device *device) {
     }
 
     device->samples = (int *) malloc((device->periodSize * device->config->channels *
-                                               snd_pcm_format_physical_width(device->config->format)) /
-                                              8);
+                                      snd_pcm_format_physical_width(device->config->format)) /
+                                     8);
 
     if(device->samples == NULL)
     { exit(EXIT_FAILURE); }
@@ -266,6 +266,10 @@ void *init_playback_thread(void *data) {
                         /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
                         drain_alsa_device(device);
                         prepare_alsa_device(device);
+                        /** Signal eof */
+                        void (*eof_callback)(sa_device * sa_device, void *myCustomData) =
+                          (void (*)(sa_device *, void *myCustomData)) device->config->eofCallback;
+                        eof_callback(device, device->myCustomData);
                     }
                     continue;
                 /** Destroy command, no continue; break out of while */

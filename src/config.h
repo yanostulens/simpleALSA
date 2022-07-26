@@ -127,6 +127,9 @@ struct sa_device_config
     /** Callback function that will be called whenever the internal buffer is running
                                     empty and new audio samples are required */
     int (*callbackFunction)(int framesToSend, void *audioBuffer, sa_device *sa_device, void *myCustomData);
+
+    /** Callback function that will be called whenever the other callback function fails to provide more samples */
+    void (*eofCallback)(sa_device *sa_device, void *myCustomData);
 };
 
 /**
@@ -151,4 +154,4 @@ typedef struct
     struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-#endif // SIMPLEALSACONFIG_H
+#endif  // SIMPLEALSACONFIG_H
