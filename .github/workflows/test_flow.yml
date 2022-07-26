@@ -9,4 +9,4 @@ jobs:
       - name: make dir
         run: mkdir build
       - name: build application
-        run: make build
+        run: make pc
