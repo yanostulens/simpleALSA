@@ -24,7 +24,7 @@ example: $(FILES)
 	$(C_COMPILER) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
 
 debug:
-	gdb $(OUTPUT_DEBUG) $(TEST_AUDIO_FILE)
+	gdb --args $(OUTPUT) $(TEST_AUDIO_FILE)
 
 run:
 	$(OUTPUT) $(TEST_AUDIO_FILE)
