@@ -62,27 +62,25 @@ DEALINGS IN THE SOFTWARE.
     #include <alsa/asoundlib.h>
 
     #ifndef SIMPLEALSACONFIG_H
-#define SIMPLEALSACONFIG_H
+        #define SIMPLEALSACONFIG_H
 
-#include <alsa/asoundlib.h>
-#include <stdbool.h>
+        #include <alsa/asoundlib.h>
+        #include <stdbool.h>
 
-#ifndef SIMPLEALSALOGGER_H
-#define SIMPLEALSALOGGER_H
+        #ifndef SIMPLEALSALOGGER_H
+            #define SIMPLEALSALOGGER_H
 
-#define SA_LOG_2_ARGS(type, msg0)        sa_log(type, msg0, "")
-#define SA_LOG_3_ARGS(type, msg0, msg1)  sa_log(type, msg0, msg1)
+            #define SA_LOG_2_ARGS(type, msg0)       sa_log(type, msg0, "")
+            #define SA_LOG_3_ARGS(type, msg0, msg1) sa_log(type, msg0, msg1)
 
-#define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
-#define SA_LOG_MACRO_CHOOSER(...) \
-    GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, \
-                SA_LOG_2_ARGS, )
+            #define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
+            #define SA_LOG_MACRO_CHOOSER(...)                GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, SA_LOG_2_ARGS, )
 
-#if defined SA_NO_LOGS
-    #define SA_LOG(...) ((void) 0)
-#else
-    #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-#endif
+            #if defined SA_NO_LOGS
+                #define SA_LOG(...) ((void) 0)
+            #else
+                #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+            #endif
 
 /**
  * @brief enum to identify different types of logs
@@ -97,38 +95,38 @@ typedef enum
 
 void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
-#endif  // SIMPLEALSALOGGER_H
+        #endif  // SIMPLEALSALOGGER_H
 
-/** MACROS **/
+    /** MACROS **/
 
-#if !defined(DEFAULT_DEVICE)
-    #define DEFAULT_DEVICE "default"
-#endif
+        #if !defined(DEFAULT_DEVICE)
+            #define DEFAULT_DEVICE "default"
+        #endif
 
-#if !defined(DEFAULT_SAMPLE_RATE)
-    #define DEFAULT_SAMPLE_RATE 48000
-#endif
+        #if !defined(DEFAULT_SAMPLE_RATE)
+            #define DEFAULT_SAMPLE_RATE 48000
+        #endif
 
-#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-    #define DEFAULT_NUMBER_OF_CHANNELS 2
-#endif
+        #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+            #define DEFAULT_NUMBER_OF_CHANNELS 2
+        #endif
 
-#if !defined(DEFAULT_AUDIO_FORMAT)
-    #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-#endif
+        #if !defined(DEFAULT_AUDIO_FORMAT)
+            #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
+        #endif
 
-#if !defined(DEFAULT_BUFFER_TIME)
-    #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
-#endif
+        #if !defined(DEFAULT_BUFFER_TIME)
+            #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
+        #endif
 
-#if !defined(DEFAULT_PERIOD_TIME)
-    #define DEFAULT_PERIOD_TIME \
-        200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
-#endif
+        #if !defined(DEFAULT_PERIOD_TIME)
+            #define DEFAULT_PERIOD_TIME \
+                200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
+        #endif
 
-#if !defined(SA_DEBUG)
-    #define SA_NO_DEBUG_LOGS
-#endif
+        #if !defined(SA_DEBUG)
+            #define SA_NO_DEBUG_LOGS
+        #endif
 
 /** ENUMS **/
 
@@ -211,7 +209,7 @@ struct sa_device
 struct sa_device_config
 {
     /** Rate at which samples are send through the soundcard */
-    int sample_rate;
+    unsigned int sample_rate;
 
     /** Amount of desired audiochannels */
     int channels;
@@ -264,7 +262,7 @@ typedef struct
     struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-#endif  // SIMPLEALSACONFIG_H
+    #endif  // SIMPLEALSACONFIG_H
 
 /** FUNCTIONS DEFINITIONS **/
 
@@ -359,7 +357,8 @@ PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS 
 FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-**/#include <stdio.h>
+**/
+#include <stdio.h>
 
 void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     switch(type)
@@ -385,10 +384,9 @@ void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     fflush(stdout);
 }
 
-
 #ifndef ALSAFUNCTIONS_H_
-#define ALSAFUNCTIONS_H_
-#include <alsa/asoundlib.h>
+    #define ALSAFUNCTIONS_H_
+    #include <alsa/asoundlib.h>
 
 /**
  * @brief Initialized an ALSA device and store some settings in de sa_device
@@ -591,7 +589,7 @@ sa_result destroy_alsa_device(sa_device *device);
 #endif  // ALSAFUNCTIONS_H_
 
 sa_result sa_init_device_config(sa_device_config **config) {
-    sa_device_config *config_temp = malloc(sizeof(sa_device_config));
+    sa_device_config *config_temp = (sa_device_config *) malloc(sizeof(sa_device_config));
     if(!config_temp)
         return SA_ERROR;
 
@@ -600,14 +598,14 @@ sa_result sa_init_device_config(sa_device_config **config) {
     config_temp->buffer_time   = DEFAULT_BUFFER_TIME;
     config_temp->period_time   = DEFAULT_PERIOD_TIME;
     config_temp->format        = DEFAULT_AUDIO_FORMAT;
-    config_temp->device        = "default";
+    config_temp->device        = (char *) "default";
     config_temp->data_callback = NULL;
     *config                    = config_temp;
     return SA_SUCCESS;
 }
 
 sa_result sa_init_device(sa_device_config *config, sa_device **device) {
-    sa_device *device_temp = malloc(sizeof(sa_device));
+    sa_device *device_temp = (sa_device *) malloc(sizeof(sa_device));
     if(!device_temp)
         return SA_ERROR;
 
@@ -847,11 +845,11 @@ sa_result prepare_playback_thread(sa_device *device) {
     /** Store the write end */
     device->pipe_write_end          = pipe_fds[1];
     /** Prepare read polling structure of the read end */
-    struct pollfd *pipe_read_end_fd = malloc(sizeof(struct pollfd));
+    struct pollfd *pipe_read_end_fd = (struct pollfd *) malloc(sizeof(struct pollfd));
     pipe_read_end_fd->fd            = pipe_fds[0];
     pipe_read_end_fd->events        = POLLIN;
     /** Startup the playback thread */
-    sa_thread_data *thread_data     = malloc(sizeof(sa_thread_data));
+    sa_thread_data *thread_data     = (sa_thread_data *) malloc(sizeof(sa_thread_data));
     thread_data->device             = device;
     thread_data->pipe_read_end_fd   = pipe_read_end_fd;
     if(pthread_create(&device->playback_thread, NULL, &init_playback_thread, (void *) thread_data) != 0)
@@ -891,33 +889,35 @@ void *init_playback_thread(void *data) {
                 {
                 /** Play command */
                 case 'u':
-                    device->state = SA_DEVICE_STARTED;
-                    sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
-                    /** The write and poll loop can end in three ways: error, a stop command is sent, or no
-                     * more audio is send to the audiobuffer */
-                    if(res == SA_ERROR)
                     {
-                        device->state = SA_DEVICE_STOPPED;
-                        break;
+                        device->state = SA_DEVICE_STARTED;
+                        sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
+                        /** The write and poll loop can end in three ways: error, a stop command is sent, or
+                         * no more audio is send to the audiobuffer */
+                        if(res == SA_ERROR)
+                        {
+                            device->state = SA_DEVICE_STOPPED;
+                            break;
+                        }
+                        if(res == SA_STOP)
+                        {
+                            drop_alsa_device(device);
+                            prepare_alsa_device(device);
+                            device->state = SA_DEVICE_STOPPED;
+                        }
+                        if(res == SA_AT_END)
+                        {
+                            /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
+                            drain_alsa_device(device);
+                            prepare_alsa_device(device);
+                            device->state = SA_DEVICE_STOPPED;
+                            /** Signal eof */
+                            void (*eof_callback)(sa_device * sa_device, void *my_custom_data) =
+                              (void (*)(sa_device *, void *my_custom_data)) device->config->eof_callback;
+                            eof_callback(device, device->config->my_custom_data);
+                        }
+                        continue;
                     }
-                    if(res == SA_STOP)
-                    {
-                        drop_alsa_device(device);
-                        prepare_alsa_device(device);
-                        device->state = SA_DEVICE_STOPPED;
-                    }
-                    if(res == SA_AT_END)
-                    {
-                        /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
-                        drain_alsa_device(device);
-                        prepare_alsa_device(device);
-                        device->state = SA_DEVICE_STOPPED;
-                        /** Signal eof */
-                        void (*eof_callback)(sa_device * sa_device, void *my_custom_data) =
-                          (void (*)(sa_device *, void *my_custom_data)) device->config->eof_callback;
-                        eof_callback(device, device->config->my_custom_data);
-                    }
-                    continue;
                 /** Destroy command, no continue; break out of while */
                 case 'd':
                     break;
@@ -965,7 +965,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
         return SA_ERROR;
     }
 
-    poll_manager_temp->ufds = malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
+    poll_manager_temp->ufds = (struct pollfd *) malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
     if(poll_manager_temp->ufds == NULL)
     {
         SA_LOG(ERROR, "Not enough memory to allocate ufds");
@@ -1107,15 +1107,17 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                     break;
                 /** Pause playback */
                 case 'p':
-                    device->state = SA_DEVICE_PAUSED;
-                    sa_result res = pause_callback_loop(poll_manager, device);
-                    /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
-                    if(res == SA_STOP)
-                        return SA_STOP;
-                    if(res == SA_UNPAUSE)
-                        unpause_PCM_handle(device);
-                    device->state = SA_DEVICE_STARTED;
-                    break;
+                    {
+                        device->state = SA_DEVICE_PAUSED;
+                        sa_result res = pause_callback_loop(poll_manager, device);
+                        /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
+                        if(res == SA_STOP)
+                            return SA_STOP;
+                        if(res == SA_UNPAUSE)
+                            unpause_PCM_handle(device);
+                        device->state = SA_DEVICE_STARTED;
+                        break;
+                    }
                 default:
                     SA_LOG(WARNING, "Command send to the pipe is ignored");
                     break;
@@ -1152,14 +1154,18 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
             {
             /** Stop playback */
             case 's':
-                device->state = SA_DEVICE_STOPPED;
-                return SA_STOP;
-                break;
+                {
+                    device->state = SA_DEVICE_STOPPED;
+                    return SA_STOP;
+                    break;
+                }
             /** Unpause */
             case 'u':
-                device->state = SA_DEVICE_STARTED;
-                return SA_UNPAUSE;
-                break;
+                {
+                    device->state = SA_DEVICE_STARTED;
+                    return SA_UNPAUSE;
+                    break;
+                }
             default:
                 break;
             }
