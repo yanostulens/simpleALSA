@@ -7,7 +7,7 @@ LIBS := -lasound -lm -lsndfile -lpthread
 
 OUTPUT := ./builds/simpleALSA.bin
 
-EXAMPLE_MAIN:= ./example.c
+EXAMPLE_MAIN:= ./examples/example.c
 TEST_MAIN := ./tests/test_main.c
 TEST_AUDIO_FILE := ./audioFiles/afraid.wav
 

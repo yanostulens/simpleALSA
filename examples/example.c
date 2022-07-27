@@ -3,7 +3,7 @@
 #include <sndfile.h>
 #include <stdio.h>
 
-#include "simpleALSA.h"
+#include "./../simpleALSA.h"
 
 void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     SNDFILE *infile_temp = sf_open(infilename, SFM_READ, sfinfo);
