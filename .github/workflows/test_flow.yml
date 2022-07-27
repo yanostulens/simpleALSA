@@ -1,7 +1,7 @@
 name: test-github-actions
 on: [push]
 jobs:
-  build:
+  build_c:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repo
@@ -14,3 +14,16 @@ jobs:
         run:  |
               mkdir build
               make pc
+  build_cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v2
+      - name: install dependencies
+        run:  |
+              sudo apt install -y libasound-dev 
+              sudo apt install -y libsndfile-dev
+      - name: build
+        run:  |
+              mkdir build
+              make pc_cpp
