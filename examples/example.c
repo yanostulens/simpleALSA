@@ -80,7 +80,7 @@ int main(int argc, char const *argv[]) {
     }
 
     /** Init sndfile */
-    char *infilename = (char *) argv[2];
+    char *infilename = (char *) argv[1];
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
     initSndFile(infilename, &sfinfo, &infile);
