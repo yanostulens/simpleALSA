@@ -1,46 +1,34 @@
-COMPILER := gcc
+C_COMPILER := gcc
+CPP_COMPILER := g++
 CFLAGS := -Wall
 OPTIMIZATION := -O2
-DEBUG_FLAG := -g
+DEBUG_FLAGS := -g -DSA_DEBUG
 LIBS := -lasound -lm -lsndfile -lpthread
-DEBUG := -DSA_DEBUG
 
 OUTPUT := ./builds/simpleALSA.bin
-OUTPUT_DEBUG := ./builds/simpleALSA_debug.bin
 
-EXAMPLE_MAIN:= ./src/simpleALSA_example_main.c
-DEBUG_MAIN := ./src/simpleALSA_example_main.c
-FILES := ./src/ALSAfunctions/ALSAfunctions.c ./src/simpleALSA_API/simpleALSA.c ./src/logger/logger.c
+EXAMPLE_MAIN:= ./example.c
+TEST_MAIN := ./tests/test_main.c
+TEST_AUDIO_FILE := ./audioFiles/afraid.wav
 
 pc: $(FILES)
 	mkdir -p builds
-	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
+	$(C_COMPILER) $(TEST_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
 
 pc_cpp: $(FILES)
 	mkdir -p builds
-	g++ $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
+	$(CPP_COMPILER) $(TEST_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
 
-pc_s:
+example: $(FILES)
 	mkdir -p builds
-	$(COMPILER) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)
+	$(C_COMPILER) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
 
-example: $(EXAMPLE_MAIN)
-	mkdir -p builds
-	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) $(OUT_PC) $(CFLAGS) $(LIBS)
-
-debug: $(FILES)
-	mkdir -p builds
-	$(COMPILER) $(FILES) $(DEBUG_MAIN) $(OUT_PC) $(CFLAGS) $(DEBUG_FLAG) $(LIBS) -o $(OUTPUT_DEBUG) $(DEBUG)
-	gdb $(OUTPUT_DEBUG)
+debug:
+	gdb $(OUTPUT_DEBUG) $(TEST_AUDIO_FILE)
 
 run:
-	./builds/simpleALSA.bin
+	$(OUTPUT) $(TEST_AUDIO_FILE)
 
 valgrind:
-	valgrind --leak-check=yes --show-leak-kinds=definite,indirect,possible --error-exitcode=1 --suppressions=./valgrind.supp ./builds/alsaPlayer2.bin
+	valgrind --leak-check=yes --show-leak-kinds=definite,indirect,possible --error-exitcode=1 --suppressions=./valgrind.supp ./builds/simpleALSA.bin $(TEST_AUDIO_FILE)
 
-header:
-	quom ./src/simpleALSA_API/simpleALSA.h ./single_header/simpleALSA.h
-	
-test:
-	echo "hello"

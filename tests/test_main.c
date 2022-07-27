@@ -1,9 +1,9 @@
+#define SA_IMPLEMENTATION
+
 #include <sndfile.h>
 #include <stdio.h>
 
-#include "./ALSAfunctions/ALSAfunctions.h"
-#include "./logger/logger.h"
-#include "./simpleALSA_API/simpleALSA.h"
+#include "./../simpleALSA.h"
 
 void initSndFile(char *infilename, SF_INFO *sfinfo, SNDFILE **infile) {
     SNDFILE *infile_temp = sf_open(infilename, SFM_READ, sfinfo);
@@ -29,7 +29,13 @@ int data_callback(int frames_to_send, void *audio_buffer, sa_device *sa_device, 
 }
 
 int main(int argc, char const *argv[]) {
-    char *infilename = (char *) "./audioFiles/big_dogs12.wav";
+    if(argc != 2)
+    {
+        printf("Oops you did not provide enough arguments\n");
+        exit(1);
+    }
+
+    char *infilename = (char *) argv[1];
     SF_INFO sfinfo;
     SNDFILE *infile = NULL;
 

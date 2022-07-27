@@ -1,135 +1,53 @@
-/**
- * @file simpleALSA.h
- * @author Yano Stulens (yano.stulens00@gmail.com)
- * @author Daan Witters (daanwitters@gmail.com)
- * @brief An easy to use wrapper around the famously complicated ALSA API's for
- * audio playback
- * @version 0.1.1
- * @date 2022-07-26
- * @link https://github.com/yanostulens/simpleALSA @endlink
- * @copyright Copyright (c) 2022 Yano Stulens - Daan Witters
- *
- * For examples and use - check the examples on the github page listed above.
- * Have fun!
- */
-/**
-==========================================================================================
-                                       LICENSE
-==========================================================================================
-Copyright © 2022 Yano Stulens
-Copyright © 2022 Daan Witters
+#ifndef SIMPLEALSA_H
+#define SIMPLEALSA_H
+/*============================== INCLUDES ==============================*/
+#include <alsa/asoundlib.h>
+#include <pthread.h>
+#include <stdbool.h>
 
-This software is release under the Creative Commons Attribution 4.0 International license.
+/*=============================== MACROS ===============================*/
+#if !defined(DEFAULT_DEVICE)
+    #define DEFAULT_DEVICE "default"
+#endif
 
-For detailed information about the CC BY license please visit:
-https://creativecommons.org/licenses/by/4.0/
+#if !defined(DEFAULT_SAMPLE_RATE)
+    #define DEFAULT_SAMPLE_RATE 48000
+#endif
 
-In a short, human version this means that:
+#if !defined(DEFAULT_NUMBER_OF_CHANNELS)
+    #define DEFAULT_NUMBER_OF_CHANNELS 2
+#endif
 
-You are free to:
-Share - copy and redistribute the material in any medium or format.
-Adapt - remix, transform, and build upon the material for any purpose,
-even commercially.
+#if !defined(DEFAULT_AUDIO_FORMAT)
+    #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
+#endif
 
-Under the following terms:
-Attribution — You must give appropriate credit, provide a link to the license,
-and indicate if changes were made. You may do so in any reasonable manner, but not in any
-way that suggests the licensor endorses you or your use.
-No additional restrictions — You may not apply legal terms or technological measures
-that legally restrict others from doing anything the license permits.
+#if !defined(DEFAULT_BUFFER_TIME)
+    #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
+#endif
 
-You do not have to comply with the license for elements of the material in the public
-domain or where your use is permitted by an applicable exception or limitation.
-No warranties are given. The license may not give you all of the permissions necessary
-for your intended use. For example, other rights such as publicity, privacy, or moral
-rights may limit how you use the material.
+#if !defined(DEFAULT_PERIOD_TIME)
+    #define DEFAULT_PERIOD_TIME \
+        200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
+#endif
 
+#if !defined(SA_DEBUG)
+    #define SA_NO_DEBUG_LOGS
+#endif
 
-==========================================================================================
-                                      DISCLAIMER
-==========================================================================================
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
-FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-**/
+#define SA_LOG_2_ARGS(type, msg0)       sa_log(type, msg0, "")
+#define SA_LOG_3_ARGS(type, msg0, msg1) sa_log(type, msg0, msg1)
 
-#ifndef SIMPLEASLA_H_
-    #define SIMPLEALSA_H_
+#define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
+#define SA_LOG_MACRO_CHOOSER(...)                GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, SA_LOG_2_ARGS, )
 
-    #include <alsa/asoundlib.h>
+#if defined SA_NO_LOGS
+    #define SA_LOG(...) ((void) 0)
+#else
+    #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+#endif
 
-    #ifndef SIMPLEALSACONFIG_H
-        #define SIMPLEALSACONFIG_H
-
-        #include <alsa/asoundlib.h>
-        #include <stdbool.h>
-
-        #ifndef SIMPLEALSALOGGER_H
-            #define SIMPLEALSALOGGER_H
-
-            #define SA_LOG_2_ARGS(type, msg0)       sa_log(type, msg0, "")
-            #define SA_LOG_3_ARGS(type, msg0, msg1) sa_log(type, msg0, msg1)
-
-            #define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
-            #define SA_LOG_MACRO_CHOOSER(...)                GET_4TH_ARG(__VA_ARGS__, SA_LOG_3_ARGS, SA_LOG_2_ARGS, )
-
-            #if defined SA_NO_LOGS
-                #define SA_LOG(...) ((void) 0)
-            #else
-                #define SA_LOG(...) SA_LOG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-            #endif
-
-/**
- * @brief enum to identify different types of logs
- *
- */
-typedef enum
-{
-    DEBUG   = 0,
-    WARNING = 1,
-    ERROR   = 2
-} sa_log_type;
-
-void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
-
-        #endif  // SIMPLEALSALOGGER_H
-
-    /** MACROS **/
-
-        #if !defined(DEFAULT_DEVICE)
-            #define DEFAULT_DEVICE "default"
-        #endif
-
-        #if !defined(DEFAULT_SAMPLE_RATE)
-            #define DEFAULT_SAMPLE_RATE 48000
-        #endif
-
-        #if !defined(DEFAULT_NUMBER_OF_CHANNELS)
-            #define DEFAULT_NUMBER_OF_CHANNELS 2
-        #endif
-
-        #if !defined(DEFAULT_AUDIO_FORMAT)
-            #define DEFAULT_AUDIO_FORMAT SND_PCM_FORMAT_S16_LE
-        #endif
-
-        #if !defined(DEFAULT_BUFFER_TIME)
-            #define DEFAULT_BUFFER_TIME 1000000 /** in µS - so one second here */
-        #endif
-
-        #if !defined(DEFAULT_PERIOD_TIME)
-            #define DEFAULT_PERIOD_TIME \
-                200000 /** in µS - so 200ms here - right now this value allows for low latency but at the cost of higher CPU load */
-        #endif
-
-        #if !defined(SA_DEBUG)
-            #define SA_NO_DEBUG_LOGS
-        #endif
-
-/** ENUMS **/
-
+/*================================ ENUMS ================================*/
 /**
  * @brief enum used to return function results
  *
@@ -157,8 +75,18 @@ typedef enum sa_device_state
     SA_DEVICE_STARTED = 2,
 } sa_device_state;
 
-/** STRUCTS **/
+/**
+ * @brief enum to identify different types of logs
+ *
+ */
+typedef enum
+{
+    DEBUG   = 0,
+    WARNING = 1,
+    ERROR   = 2
+} sa_log_type;
 
+/*=============================== STRUCTS ===============================*/
 typedef struct sa_device sa_device;
 typedef struct sa_device_config sa_device_config;
 
@@ -262,16 +190,25 @@ typedef struct
     struct pollfd *pipe_read_end_fd;
 } sa_thread_data;
 
-    #endif  // SIMPLEALSACONFIG_H
+/*************************************************************************************************************************************************************/
+/*************************************************************************************************************************************************************/
+/*****************************************************************DECLARATIONS/DEFINITIONS*********************************************************************/
+/*************************************************************************************************************************************************************/
+/*************************************************************************************************************************************************************/
 
-/** FUNCTIONS DEFINITIONS **/
+/** Prevent parsers from greying out the following */
+#if defined(__INTELLISENSE__)
+    #define SA_IMPLEMENTATION
+#endif
 
+#if defined SA_IMPLEMENTATION
+/*=========================== API DECLARATIONS ===========================*/
 /**
  * @brief creates an sa_device_config struct and sets it to default values
  * @param device - empty pointer into which the config struct is set
  * @return sa_return_status
  */
-sa_result sa_init_device_config(sa_device_config **config);
+extern sa_result sa_init_device_config(sa_device_config **config);
 
 /**
  * @brief initializes a new audio device
@@ -279,7 +216,7 @@ sa_result sa_init_device_config(sa_device_config **config);
  * @param device - pointer to the initialized audio device
  * @return sa_return_status
  */
-sa_result sa_init_device(sa_device_config *config, sa_device **device);
+extern sa_result sa_init_device(sa_device_config *config, sa_device **device);
 
 /**
  * @brief starts the simple ALSA device - which starts the callback loop
@@ -287,7 +224,7 @@ sa_result sa_init_device(sa_device_config *config, sa_device **device);
  * @param device - device to start
  * @return sa_return_status
  */
-sa_result sa_start_device(sa_device *device);
+extern sa_result sa_start_device(sa_device *device);
 
 /**
  * @brief pauses the simple ALSA device - which pauses the callback loop
@@ -295,7 +232,7 @@ sa_result sa_start_device(sa_device *device);
  * @param device - device to pause
  * @return sa_return_status
  */
-sa_result sa_pause_device(sa_device *device);
+extern sa_result sa_pause_device(sa_device *device);
 
 /**
  * @brief stops a simple ALSA device - same as pause but in addation, all buffer data is dropped
@@ -303,7 +240,7 @@ sa_result sa_pause_device(sa_device *device);
  * @param device - device to stop
  * @return sa_return_status
  */
-sa_result sa_stop_device(sa_device *device);
+extern sa_result sa_stop_device(sa_device *device);
 
 /**
  * @brief destroys the device - device pointer is set to NULL
@@ -311,89 +248,18 @@ sa_result sa_stop_device(sa_device *device);
  * @param device - the device to destroy
  * @return sa_return_status
  */
-sa_result sa_destroy_device(sa_device *device);
+extern sa_result sa_destroy_device(sa_device *device);
 
-#endif  // SIMPLEALSA_H_
+/*=========================== LOG DECLARATIONS ===========================*/
+static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
-/**
-==========================================================================================
-                                       LICENSE
-==========================================================================================
-Copyright © 2022 Yano Stulens
-Copyright © 2022 Daan Witters
-
-This software is release under the Creative Commons Attribution 4.0 International license.
-
-For detailed information about the CC BY license please visit:
-https://creativecommons.org/licenses/by/4.0/
-
-In a short, human version this means that:
-
-You are free to:
-Share - copy and redistribute the material in any medium or format.
-Adapt - remix, transform, and build upon the material for any purpose,
-even commercially.
-
-Under the following terms:
-Attribution — You must give appropriate credit, provide a link to the license,
-and indicate if changes were made. You may do so in any reasonable manner, but not in any
-way that suggests the licensor endorses you or your use.
-No additional restrictions — You may not apply legal terms or technological measures
-that legally restrict others from doing anything the license permits.
-
-You do not have to comply with the license for elements of the material in the public
-domain or where your use is permitted by an applicable exception or limitation.
-No warranties are given. The license may not give you all of the permissions necessary
-for your intended use. For example, other rights such as publicity, privacy, or moral
-rights may limit how you use the material.
-
-
-==========================================================================================
-                                       DISCLAIMER
-==========================================================================================
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
-FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-**/
-#include <stdio.h>
-
-void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
-    switch(type)
-    {
-#ifndef SA_NO_ERROR_LOGS
-    case ERROR:
-        printf("\e[1;31m[  ERROR   ] \e[0m %s %s\n", msg0, msg1);
-        break;
-#endif
-#ifndef SA_NO_WARNING_LOGS
-    case WARNING:
-        printf("\e[1;33m[  WARNING ] \e[0m %s %s\n", msg0, msg1);
-        break;
-#endif
-#ifndef SA_NO_DEBUG_LOGS
-    case DEBUG:
-        printf("\e[1;35m[  DEBUG   ] \e[0m %s %s\n", msg0, msg1);
-        break;
-#endif
-    default:
-        break;
-    }
-    fflush(stdout);
-}
-
-#ifndef ALSAFUNCTIONS_H_
-    #define ALSAFUNCTIONS_H_
-    #include <alsa/asoundlib.h>
-
+/*======================== ALSA FUNC DECLARATIONS ========================*/
 /**
  * @brief Initialized an ALSA device and store some settings in de sa_device
  *
  * @return sa_result
  */
-sa_result init_alsa_device(sa_device *device);
+static sa_result init_alsa_device(sa_device *device);
 
 /**
  * @brief Sets the ALSA hardware parameters
@@ -402,14 +268,15 @@ sa_result init_alsa_device(sa_device *device);
  * @param access
  * @return sa_result
  */
-sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access);
+static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access);
+
 /**
  * @brief Sets the ALSA software parameters
  *
  * @param device
  * @return sa_result
  */
-sa_result set_software_parameters(sa_device *device);
+static sa_result set_software_parameters(sa_device *device);
 
 /**
  * @brief Prepares and starts the playback thread and creates a communication pipe
@@ -417,14 +284,15 @@ sa_result set_software_parameters(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result prepare_playback_thread(sa_device *device);
+static sa_result prepare_playback_thread(sa_device *device);
+
 /**
  * @brief Starts the ALSA write and wait loop
  *
  * @param device
  * @return sa_result
  */
-sa_result start_alsa_device(sa_device *device);
+static sa_result start_alsa_device(sa_device *device);
 
 /**
  * @brief Sends out a message to the transfer loop to pause audio output
@@ -432,7 +300,7 @@ sa_result start_alsa_device(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result pause_alsa_device(sa_device *device);
+static sa_result pause_alsa_device(sa_device *device);
 
 /**
  * @brief Sends out a message to the transfer loop to unpause audio output
@@ -440,7 +308,7 @@ sa_result pause_alsa_device(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result unpause_alsa_device(sa_device *device);
+static sa_result unpause_alsa_device(sa_device *device);
 
 /**
  * @brief Sends out a message to stop the transfer loop
@@ -448,7 +316,7 @@ sa_result unpause_alsa_device(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result stop_alsa_device(sa_device *device);
+static sa_result stop_alsa_device(sa_device *device);
 
 /**
  * @brief Drops the samples of the internal ALSA buffer and stop the ALSA pcm handle
@@ -456,7 +324,7 @@ sa_result stop_alsa_device(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result drop_alsa_device(sa_device *device);
+static sa_result drop_alsa_device(sa_device *device);
 
 /**
  * @brief Drains the samples of the internal ALSA buffer and stops the ALSA pcm handle
@@ -464,7 +332,7 @@ sa_result drop_alsa_device(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result drain_alsa_device(sa_device *device);
+static sa_result drain_alsa_device(sa_device *device);
 
 /**
  * @brief Initializes the polling filedescriptors for ALSA and links it to the communication pipe
@@ -474,8 +342,8 @@ sa_result drain_alsa_device(sa_device *device);
  * @param pipe_read_end_fd
  * @return sa_result
  */
-sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
-                               struct pollfd *pipe_read_end_fd);
+static sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
+                                      struct pollfd *pipe_read_end_fd);
 
 /**
  * @brief Starts the audio playback thread by running the write and poll loop
@@ -483,7 +351,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
  * @param data: a sa_thread_data packet
  *
  */
-void *init_playback_thread(void *data);
+static void *init_playback_thread(void *data);
 
 /**
  * @brief Attempts to join the playback thread
@@ -491,7 +359,8 @@ void *init_playback_thread(void *data);
  * @param device
  * @return sa_result
  */
-sa_result close_playback_thread(sa_device *device);
+static sa_result close_playback_thread(sa_device *device);
+
 /**
  * @brief Prepares and starts write_and_poll_loop
  *
@@ -499,7 +368,7 @@ sa_result close_playback_thread(sa_device *device);
  * @param pipe_read_end_fd
  * @return sa_result
  */
-sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd);
+static sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd);
 
 /**
  * @brief Plays audio by repeatedly calling the callback function for framas
@@ -508,7 +377,7 @@ sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_
  * @param poll_manager
  * @return sa_result
  */
-sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager);
+static sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager);
 
 /**
  * @brief Waits on poll and checks pipe
@@ -517,7 +386,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
  * @param poll_manager
  * @return int
  */
-int wait_for_poll(sa_device *device, sa_poll_management *poll_manager);
+static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager);
 
 /**
  * @brief Try to recover from errors during playback
@@ -526,14 +395,16 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager);
  * @param err
  * @return sa_result
  */
-sa_result xrun_recovery(snd_pcm_t *handle, int err);
+static sa_result xrun_recovery(snd_pcm_t *handle, int err);
+
 /**
  * @brief reclaims sa_device
  *
  * @param device
  * @return sa_result
  */
-sa_result cleanup_device(sa_device *device);
+static sa_result cleanup_device(sa_device *device);
+
 /**
  * @brief Messages a char to the playback thread via a pipe
  *
@@ -541,7 +412,7 @@ sa_result cleanup_device(sa_device *device);
  * @param toSend
  * @return sa_result
  */
-sa_result message_pipe(sa_device *device, char toSend);
+static sa_result message_pipe(sa_device *device, char toSend);
 
 /**
  * @brief Pauses the callback loop, this function will pause the PCM handle by calling pause_PCM_handle().
@@ -551,7 +422,7 @@ sa_result message_pipe(sa_device *device, char toSend);
  * @param handle
  * @return sa_result
  */
-sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device);
+static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device);
 
 /**
  * @brief Checks whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
@@ -560,7 +431,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
  * @param device
  * @return sa_result
  */
-sa_result pause_PCM_handle(sa_device *device);
+static sa_result pause_PCM_handle(sa_device *device);
 
 /**
  * @brief Checks whether the pcm was paused using snd_pcm_pause() or not and resume the pcm accordingly.
@@ -568,7 +439,7 @@ sa_result pause_PCM_handle(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result unpause_PCM_handle(sa_device *device);
+static sa_result unpause_PCM_handle(sa_device *device);
 
 /**
  * @brief Prepares the ALSA device so it is ready for a restart
@@ -576,7 +447,7 @@ sa_result unpause_PCM_handle(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result prepare_alsa_device(sa_device *device);
+static sa_result prepare_alsa_device(sa_device *device);
 
 /**
  * @brief Destroys the ALSA device, closes threads and frees all allocated memory
@@ -584,11 +455,10 @@ sa_result prepare_alsa_device(sa_device *device);
  * @param device
  * @return sa_result
  */
-sa_result destroy_alsa_device(sa_device *device);
+static sa_result destroy_alsa_device(sa_device *device);
 
-#endif  // ALSAFUNCTIONS_H_
-
-sa_result sa_init_device_config(sa_device_config **config) {
+/*========================= API DEFINITIONS ==========================*/
+extern sa_result sa_init_device_config(sa_device_config **config) {
     sa_device_config *config_temp = (sa_device_config *) malloc(sizeof(sa_device_config));
     if(!config_temp)
         return SA_ERROR;
@@ -604,7 +474,7 @@ sa_result sa_init_device_config(sa_device_config **config) {
     return SA_SUCCESS;
 }
 
-sa_result sa_init_device(sa_device_config *config, sa_device **device) {
+extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     sa_device *device_temp = (sa_device *) malloc(sizeof(sa_device));
     if(!device_temp)
         return SA_ERROR;
@@ -615,33 +485,58 @@ sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     return init_alsa_device(*device);
 }
 
-sa_result sa_start_device(sa_device *device) {
+extern sa_result sa_start_device(sa_device *device) {
     if(device->state != SA_DEVICE_STARTED)
         return start_alsa_device(device);
     else
         return SA_INVALID_STATE;
 }
 
-sa_result sa_stop_device(sa_device *device) {
+extern sa_result sa_stop_device(sa_device *device) {
     if(device->state != SA_DEVICE_STOPPED)
         return stop_alsa_device(device);
     else
         return SA_INVALID_STATE;
 }
 
-sa_result sa_pause_device(sa_device *device) {
+extern sa_result sa_pause_device(sa_device *device) {
     if(device->state == SA_DEVICE_STARTED)
         return pause_alsa_device(device);
     else
         return SA_INVALID_STATE;
 }
 
-sa_result sa_destroy_device(sa_device *device) {
+extern sa_result sa_destroy_device(sa_device *device) {
     return destroy_alsa_device(device);
 }
-#include <pthread.h>
 
-sa_result init_alsa_device(sa_device *device) {
+/*========================= LOG DEFINITIONS ==========================*/
+static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
+    switch(type)
+    {
+    #ifndef SA_NO_ERROR_LOGS
+    case ERROR:
+        printf("\e[1;31m[  ERROR   ] \e[0m %s %s\n", msg0, msg1);
+        break;
+    #endif
+    #ifndef SA_NO_WARNING_LOGS
+    case WARNING:
+        printf("\e[1;33m[  WARNING ] \e[0m %s %s\n", msg0, msg1);
+        break;
+    #endif
+    #ifndef SA_NO_DEBUG_LOGS
+    case DEBUG:
+        printf("\e[1;35m[  DEBUG   ] \e[0m %s %s\n", msg0, msg1);
+        break;
+    #endif
+    default:
+        break;
+    }
+    fflush(stdout);
+}
+
+/*======================= ALSA FUNC DEFINITIONS ======================*/
+static sa_result init_alsa_device(sa_device *device) {
     int err;
     snd_pcm_hw_params_alloca(&(device->hw_params));
     snd_pcm_sw_params_alloca(&(device->sw_params));
@@ -685,7 +580,7 @@ sa_result init_alsa_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
+static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     unsigned int rrate;
     snd_pcm_uframes_t size;
     int err, dir;
@@ -778,7 +673,7 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     return SA_SUCCESS;
 }
 
-sa_result set_software_parameters(sa_device *device) {
+static sa_result set_software_parameters(sa_device *device) {
     int err;
 
     /* Get the current sw_params */
@@ -826,7 +721,7 @@ sa_result set_software_parameters(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result prepare_playback_thread(sa_device *device) {
+static sa_result prepare_playback_thread(sa_device *device) {
     /** Prepare communication pipe */
     int pipe_fds[2];
     if(pipe(pipe_fds))
@@ -860,11 +755,11 @@ sa_result prepare_playback_thread(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result start_alsa_device(sa_device *device) {
+static sa_result start_alsa_device(sa_device *device) {
     return unpause_alsa_device(device);
 }
 
-void *init_playback_thread(void *data) {
+static void *init_playback_thread(void *data) {
     char command;
     /** Unwrap the data packet */
     sa_thread_data *thread_data     = (sa_thread_data *) data;
@@ -935,7 +830,7 @@ void *init_playback_thread(void *data) {
     return NULL;
 }
 
-sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd) {
+static sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_end_fd) {
     sa_result result                 = SA_ERROR;
     sa_poll_management *poll_manager = NULL;
     /** Init the poll manager */
@@ -952,8 +847,8 @@ sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pipe_read_
     return result;
 }
 
-sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
-                               struct pollfd *pipe_read_end_fd) {
+static sa_result init_poll_management(sa_device *device, sa_poll_management **poll_manager,
+                                      struct pollfd *pipe_read_end_fd) {
     sa_poll_management *poll_manager_temp = (sa_poll_management *) malloc(sizeof(sa_poll_management));
     int err;
 
@@ -985,7 +880,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
     return SA_SUCCESS;
 }
 
-sa_result close_playback_thread(sa_device *device) {
+static sa_result close_playback_thread(sa_device *device) {
     if(pthread_join(device->playback_thread, NULL) != 0)
     {
         SA_LOG(ERROR, "Could not join playback thread");
@@ -994,7 +889,7 @@ sa_result close_playback_thread(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
+static sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manager) {
     int *ptr;
     int err, cptr, init, readcount;
     readcount = 1;
@@ -1084,7 +979,7 @@ sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll_manage
     return SA_SUCCESS;
 }
 
-int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
+static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
     unsigned short revents;
     char command;
     while(1)
@@ -1137,7 +1032,7 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
     return -1;
 }
 
-sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device) {
+static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device) {
     pause_PCM_handle(device);
 
     int pauzed = 1;
@@ -1174,7 +1069,7 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
     return SA_ERROR;
 }
 
-sa_result xrun_recovery(snd_pcm_t *handle, int err) {
+static sa_result xrun_recovery(snd_pcm_t *handle, int err) {
     SA_LOG(DEBUG, "ASLA: xrun occured");
     if(err == -EPIPE)
     { /* Underrun */
@@ -1205,7 +1100,7 @@ sa_result xrun_recovery(snd_pcm_t *handle, int err) {
     return SA_ERROR;
 }
 
-sa_result pause_alsa_device(sa_device *device) {
+static sa_result pause_alsa_device(sa_device *device) {
     if(message_pipe(device, 'p') == SA_ERROR)
     {
         SA_LOG(ERROR, "Could not send pause command to the message pipe");
@@ -1214,7 +1109,7 @@ sa_result pause_alsa_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result unpause_alsa_device(sa_device *device) {
+static sa_result unpause_alsa_device(sa_device *device) {
     if(message_pipe(device, 'u') == SA_ERROR)
     {
         SA_LOG(ERROR, "Could not send unpause command to the message pipe");
@@ -1223,7 +1118,7 @@ sa_result unpause_alsa_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result stop_alsa_device(sa_device *device) {
+static sa_result stop_alsa_device(sa_device *device) {
     if(message_pipe(device, 's') == SA_ERROR)
     {
         SA_LOG(ERROR, "Could not send cancel command to the message pipe");
@@ -1232,7 +1127,7 @@ sa_result stop_alsa_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result pause_PCM_handle(sa_device *device) {
+static sa_result pause_PCM_handle(sa_device *device) {
     if(device->supports_pause)
     {
         if(snd_pcm_pause(device->handle, 1) != 0)
@@ -1249,7 +1144,7 @@ sa_result pause_PCM_handle(sa_device *device) {
     return SA_ERROR;
 }
 
-sa_result unpause_PCM_handle(sa_device *device) {
+static sa_result unpause_PCM_handle(sa_device *device) {
     if(device->supports_pause)
     {
         if(snd_pcm_pause(device->handle, 0) != 0)
@@ -1261,7 +1156,7 @@ sa_result unpause_PCM_handle(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result drop_alsa_device(sa_device *device) {
+static sa_result drop_alsa_device(sa_device *device) {
     SA_LOG(DEBUG, "ALSA drop called");
     int err = 0;
     if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
@@ -1278,7 +1173,7 @@ sa_result drop_alsa_device(sa_device *device) {
     exit(EXIT_FAILURE);
 }
 
-sa_result drain_alsa_device(sa_device *device) {
+static sa_result drain_alsa_device(sa_device *device) {
     SA_LOG(DEBUG, "ALSA drain called");
     int err = 0;
     if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
@@ -1295,7 +1190,7 @@ sa_result drain_alsa_device(sa_device *device) {
     exit(EXIT_FAILURE);
 }
 
-sa_result prepare_alsa_device(sa_device *device) {
+static sa_result prepare_alsa_device(sa_device *device) {
     SA_LOG(DEBUG, "ALSA prepare called");
     if(device->handle && snd_pcm_prepare(device->handle) == 0)
     { return SA_SUCCESS; }
@@ -1303,7 +1198,7 @@ sa_result prepare_alsa_device(sa_device *device) {
     exit(EXIT_FAILURE);
 }
 
-sa_result message_pipe(sa_device *device, char toSend) {
+static sa_result message_pipe(sa_device *device, char toSend) {
     int result = write(device->pipe_write_end, &toSend, 1);
     if(result != 1)
     {
@@ -1313,7 +1208,7 @@ sa_result message_pipe(sa_device *device, char toSend) {
     return SA_SUCCESS;
 }
 
-sa_result cleanup_device(sa_device *device) {
+static sa_result cleanup_device(sa_device *device) {
     if(device)
     {
         close(device->pipe_write_end);
@@ -1335,7 +1230,7 @@ sa_result cleanup_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
-sa_result destroy_alsa_device(sa_device *device) {
+static sa_result destroy_alsa_device(sa_device *device) {
     stop_alsa_device(device);
     message_pipe(device, 'd');
     if(close_playback_thread(device) == SA_ERROR)
@@ -1345,3 +1240,5 @@ sa_result destroy_alsa_device(sa_device *device) {
     }
     return cleanup_device(device);
 }
+#endif  // SA_IMPLEMENTATION
+#endif  // SIMPLEALSA_H
