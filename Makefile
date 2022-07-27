@@ -16,6 +16,10 @@ pc: $(FILES)
 	mkdir -p builds
 	$(COMPILER) $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
 
+pc_cpp: $(FILES)
+	mkdir -p builds
+	g++ $(FILES) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION) $(DEBUG)
+
 pc_s:
 	mkdir -p builds
 	$(COMPILER) $(EXAMPLE_MAIN) -o $(OUTPUT) $(CFLAGS) $(LIBS) $(OPTIMIZATION)

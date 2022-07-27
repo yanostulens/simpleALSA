@@ -118,7 +118,7 @@ struct sa_device
 struct sa_device_config
 {
     /** Rate at which samples are send through the soundcard */
-    int sample_rate;
+    unsigned int sample_rate;
 
     /** Amount of desired audiochannels */
     int channels;

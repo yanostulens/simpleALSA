@@ -3,7 +3,7 @@
 #include "../ALSAfunctions/ALSAfunctions.h"
 
 sa_result sa_init_device_config(sa_device_config **config) {
-    sa_device_config *config_temp = malloc(sizeof(sa_device_config));
+    sa_device_config *config_temp = (sa_device_config *) malloc(sizeof(sa_device_config));
     if(!config_temp)
         return SA_ERROR;
 
@@ -12,14 +12,14 @@ sa_result sa_init_device_config(sa_device_config **config) {
     config_temp->buffer_time   = DEFAULT_BUFFER_TIME;
     config_temp->period_time   = DEFAULT_PERIOD_TIME;
     config_temp->format        = DEFAULT_AUDIO_FORMAT;
-    config_temp->device        = "default";
+    config_temp->device        = (char *) "default";
     config_temp->data_callback = NULL;
     *config                    = config_temp;
     return SA_SUCCESS;
 }
 
 sa_result sa_init_device(sa_device_config *config, sa_device **device) {
-    sa_device *device_temp = malloc(sizeof(sa_device));
+    sa_device *device_temp = (sa_device *) malloc(sizeof(sa_device));
     if(!device_temp)
         return SA_ERROR;
 

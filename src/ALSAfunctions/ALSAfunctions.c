@@ -118,7 +118,7 @@ sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t access) {
     device->buffer_size = size;
     /* Set the period time */
     err                 = snd_pcm_hw_params_set_period_time_near(device->handle, device->hw_params,
-                                                                 (unsigned int *) &(device->config->period_time), &dir);
+                                                 (unsigned int *) &(device->config->period_time), &dir);
     if(err < 0)
     {
         SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
@@ -208,11 +208,11 @@ sa_result prepare_playback_thread(sa_device *device) {
     /** Store the write end */
     device->pipe_write_end          = pipe_fds[1];
     /** Prepare read polling structure of the read end */
-    struct pollfd *pipe_read_end_fd = malloc(sizeof(struct pollfd));
+    struct pollfd *pipe_read_end_fd = (struct pollfd *) malloc(sizeof(struct pollfd));
     pipe_read_end_fd->fd            = pipe_fds[0];
     pipe_read_end_fd->events        = POLLIN;
     /** Startup the playback thread */
-    sa_thread_data *thread_data     = malloc(sizeof(sa_thread_data));
+    sa_thread_data *thread_data     = (sa_thread_data *) malloc(sizeof(sa_thread_data));
     thread_data->device             = device;
     thread_data->pipe_read_end_fd   = pipe_read_end_fd;
     if(pthread_create(&device->playback_thread, NULL, &init_playback_thread, (void *) thread_data) != 0)
@@ -252,33 +252,35 @@ void *init_playback_thread(void *data) {
                 {
                 /** Play command */
                 case 'u':
-                    device->state = SA_DEVICE_STARTED;
-                    sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
-                    /** The write and poll loop can end in three ways: error, a stop command is sent, or no
-                     * more audio is send to the audiobuffer */
-                    if(res == SA_ERROR)
                     {
-                        device->state = SA_DEVICE_STOPPED;
-                        break;
+                        device->state = SA_DEVICE_STARTED;
+                        sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
+                        /** The write and poll loop can end in three ways: error, a stop command is sent, or
+                         * no more audio is send to the audiobuffer */
+                        if(res == SA_ERROR)
+                        {
+                            device->state = SA_DEVICE_STOPPED;
+                            break;
+                        }
+                        if(res == SA_STOP)
+                        {
+                            drop_alsa_device(device);
+                            prepare_alsa_device(device);
+                            device->state = SA_DEVICE_STOPPED;
+                        }
+                        if(res == SA_AT_END)
+                        {
+                            /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
+                            drain_alsa_device(device);
+                            prepare_alsa_device(device);
+                            device->state = SA_DEVICE_STOPPED;
+                            /** Signal eof */
+                            void (*eof_callback)(sa_device * sa_device, void *my_custom_data) =
+                              (void (*)(sa_device *, void *my_custom_data)) device->config->eof_callback;
+                            eof_callback(device, device->config->my_custom_data);
+                        }
+                        continue;
                     }
-                    if(res == SA_STOP)
-                    {
-                        drop_alsa_device(device);
-                        prepare_alsa_device(device);
-                        device->state = SA_DEVICE_STOPPED;
-                    }
-                    if(res == SA_AT_END)
-                    {
-                        /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
-                        drain_alsa_device(device);
-                        prepare_alsa_device(device);
-                        device->state = SA_DEVICE_STOPPED;
-                        /** Signal eof */
-                        void (*eof_callback)(sa_device * sa_device, void *my_custom_data) =
-                          (void (*)(sa_device *, void *my_custom_data)) device->config->eof_callback;
-                        eof_callback(device, device->config->my_custom_data);
-                    }
-                    continue;
                 /** Destroy command, no continue; break out of while */
                 case 'd':
                     break;
@@ -326,7 +328,7 @@ sa_result init_poll_management(sa_device *device, sa_poll_management **poll_mana
         return SA_ERROR;
     }
 
-    poll_manager_temp->ufds = malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
+    poll_manager_temp->ufds = (struct pollfd *) malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
     if(poll_manager_temp->ufds == NULL)
     {
         SA_LOG(ERROR, "Not enough memory to allocate ufds");
@@ -468,15 +470,17 @@ int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                     break;
                 /** Pause playback */
                 case 'p':
-                    device->state = SA_DEVICE_PAUSED;
-                    sa_result res = pause_callback_loop(poll_manager, device);
-                    /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
-                    if(res == SA_STOP)
-                        return SA_STOP;
-                    if(res == SA_UNPAUSE)
-                        unpause_PCM_handle(device);
-                    device->state = SA_DEVICE_STARTED;
-                    break;
+                    {
+                        device->state = SA_DEVICE_PAUSED;
+                        sa_result res = pause_callback_loop(poll_manager, device);
+                        /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
+                        if(res == SA_STOP)
+                            return SA_STOP;
+                        if(res == SA_UNPAUSE)
+                            unpause_PCM_handle(device);
+                        device->state = SA_DEVICE_STARTED;
+                        break;
+                    }
                 default:
                     SA_LOG(WARNING, "Command send to the pipe is ignored");
                     break;
@@ -513,14 +517,18 @@ sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *devic
             {
             /** Stop playback */
             case 's':
-                device->state = SA_DEVICE_STOPPED;
-                return SA_STOP;
-                break;
+                {
+                    device->state = SA_DEVICE_STOPPED;
+                    return SA_STOP;
+                    break;
+                }
             /** Unpause */
             case 'u':
-                device->state = SA_DEVICE_STARTED;
-                return SA_UNPAUSE;
-                break;
+                {
+                    device->state = SA_DEVICE_STARTED;
+                    return SA_UNPAUSE;
+                    break;
+                }
             default:
                 break;
             }
