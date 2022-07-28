@@ -885,7 +885,7 @@ static void *init_playback_thread(void *data) {
                 case 'd':
                     break;
                 default:
-                    SA_LOG(WARNING, "Command sent to the pipe is ignored");
+                    SA_LOG(DEBUG, "Command sent to the pipe is ignored");
                     continue;
                 }
                 SA_LOG(DEBUG, "Attempting to destroy the device");
@@ -1085,7 +1085,7 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                         break;
                     }
                 default:
-                    SA_LOG(WARNING, "Command send to the pipe is ignored");
+                    SA_LOG(DEBUG, "Command sent to the pipe is ignored");
                     break;
                 }
             }
