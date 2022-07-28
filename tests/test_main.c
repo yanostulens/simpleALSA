@@ -78,7 +78,7 @@ int main(int argc, char const *argv[]) {
             {
                 sf_seek(infile, 0, SEEK_SET);
             } else if(strcmp(input, "state\n") == 0)
-            { printf("State = %i\n", device->state); }
+            { printf("State = %i\n", sa_get_device_state(device)); }
         }
     }
     sf_close(infile);

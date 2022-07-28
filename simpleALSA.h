@@ -250,6 +250,8 @@ extern sa_result sa_stop_device(sa_device *device);
  */
 extern sa_result sa_destroy_device(sa_device *device);
 
+extern sa_device_state sa_get_device_state(sa_device *device);
+
 /*=========================== LOG DECLARATIONS ===========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
@@ -510,6 +512,9 @@ extern sa_result sa_destroy_device(sa_device *device) {
     return destroy_alsa_device(device);
 }
 
+extern sa_device_state sa_get_device_state(sa_device *device) {
+    return device->state;
+}
 /*========================= LOG DEFINITIONS ==========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     switch(type)
