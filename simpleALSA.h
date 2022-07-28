@@ -489,23 +489,33 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
 
 extern sa_result sa_start_device(sa_device *device) {
     if(device->state != SA_DEVICE_STARTED)
+    {
         return start_alsa_device(device);
-    else
+    } else
+    {
+        SA_LOG(ERROR, "Unable to start the device, the device is already started");
         return SA_INVALID_STATE;
+    }
 }
 
 extern sa_result sa_stop_device(sa_device *device) {
     if(device->state != SA_DEVICE_STOPPED)
         return stop_alsa_device(device);
     else
+    {
+        SA_LOG(ERROR, "Unable to stop the device, the device is already stopped");
         return SA_INVALID_STATE;
+    }
 }
 
 extern sa_result sa_pause_device(sa_device *device) {
     if(device->state == SA_DEVICE_STARTED)
         return pause_alsa_device(device);
     else
+    {
+        SA_LOG(ERROR, "Unable to pause the device, the device is already ");
         return SA_INVALID_STATE;
+    }
 }
 
 extern sa_result sa_destroy_device(sa_device *device) {
@@ -790,7 +800,6 @@ static void *init_playback_thread(void *data) {
                 /** Play command */
                 case 'u':
                     {
-                        device->state = SA_DEVICE_STARTED;
                         sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
                         /** The write and poll loop can end in three ways: error, a stop command is sent, or
                          * no more audio is send to the audiobuffer */
@@ -1008,14 +1017,17 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 /** Pause playback */
                 case 'p':
                     {
-                        device->state = SA_DEVICE_PAUSED;
                         sa_result res = pause_callback_loop(poll_manager, device);
                         /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
                         if(res == SA_STOP)
-                            return SA_STOP;
+                        { return SA_STOP; }
+
                         if(res == SA_UNPAUSE)
+                        {
                             unpause_PCM_handle(device);
-                        device->state = SA_DEVICE_STARTED;
+                            device->state = SA_DEVICE_STARTED;
+                        }
+
                         break;
                     }
                 default:
@@ -1111,6 +1123,7 @@ static sa_result pause_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send pause command to the message pipe");
         return SA_ERROR;
     };
+    device->state = SA_DEVICE_PAUSED;
     return SA_SUCCESS;
 }
 
@@ -1120,6 +1133,7 @@ static sa_result unpause_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send unpause command to the message pipe");
         return SA_ERROR;
     };
+    device->state = SA_DEVICE_STARTED;
     return SA_SUCCESS;
 }
 
@@ -1129,6 +1143,7 @@ static sa_result stop_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send cancel command to the message pipe");
         return SA_ERROR;
     };
+    device->state = SA_DEVICE_STOPPED;
     return SA_SUCCESS;
 }
 
