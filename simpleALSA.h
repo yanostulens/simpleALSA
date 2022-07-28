@@ -89,7 +89,7 @@ typedef enum
 /*=============================== STRUCTS ===============================*/
 typedef struct sa_device sa_device;
 typedef struct sa_device_config sa_device_config;
-
+typedef struct sa_condition_variable sa_condition_variable;
 /**
  * @brief struct used to encapsulate a simple ALSA device
  *
@@ -128,6 +128,9 @@ struct sa_device
 
     /** Reference to the playback thread */
     pthread_t playback_thread;
+
+    /** A condition variable and mutex used to communicate device stoppage */
+    sa_condition_variable *condition_var;
 };
 
 /**
@@ -169,6 +172,20 @@ struct sa_device_config
 };
 
 /**
+ * @brief a struct used to indicate wether the devices has stopped in a thread safe way
+ *
+ */
+struct sa_condition_variable
+{
+    /** Condition variable */
+    pthread_cond_t cond;
+    /** Mutex to protect variable */
+    pthread_mutex_t mutex;
+    /** The variable */
+    bool is_stopped;
+};
+
+/**
  * @brief holds everything related to polling
  */
 typedef struct
@@ -197,7 +214,7 @@ typedef struct
 /*************************************************************************************************************************************************************/
 
 /** Prevent parsers from greying out the following */
-#if defined(__INTELLISENSE__)
+#if defined(__INTELLISENSE__) || defined(Q_CREATOR_RUN)
     #define SA_IMPLEMENTATION
 #endif
 
@@ -235,12 +252,20 @@ extern sa_result sa_start_device(sa_device *device);
 extern sa_result sa_pause_device(sa_device *device);
 
 /**
- * @brief stops a simple ALSA device - same as pause but in addation, all buffer data is dropped
+ * @brief stops a simple ALSA device - same as pause but in addition, all buffer data is dropped
  *
  * @param device - device to stop
  * @return sa_return_status
  */
 extern sa_result sa_stop_device(sa_device *device);
+
+/**
+ * @brief stops a simple ALSA device - same sa_stop_device, but blocks until the devices has actually stopped
+ *
+ * @param device - device to stop
+ * @return sa_return_status
+ */
+extern sa_result sa_stop_device_blocking(sa_device *device);
 
 /**
  * @brief destroys the device - device pointer is set to NULL
@@ -317,6 +342,14 @@ static sa_result unpause_alsa_device(sa_device *device);
  * @return sa_result
  */
 static sa_result stop_alsa_device(sa_device *device);
+
+/**
+ * @brief Waits until the transfer loop stops
+ *
+ * @param device
+ * @return sa_result
+ */
+static sa_result wait_for_stop_alsa_device(sa_device *device);
 
 /**
  * @brief Drops the samples of the internal ALSA buffer and stop the ALSA pcm handle
@@ -425,6 +458,14 @@ static sa_result message_pipe(sa_device *device, char toSend);
 static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device *device);
 
 /**
+ * @brief Saves the device state and signals if it has stopped
+ *
+ * @param device
+ * @param new_state
+ * @return void
+ */
+static void save_device_state(sa_device *device, sa_device_state new_state);
+/**
  * @brief Checks whether the hardware support pausing, if so it pauses using snd_pcm_pause(). If the hw does
  * not support pausing it uses snd_pcm_drop() and prepares the the device using snd_pcm_prepare().
  *
@@ -497,6 +538,12 @@ extern sa_result sa_stop_device(sa_device *device) {
         return stop_alsa_device(device);
     else
         return SA_INVALID_STATE;
+}
+extern sa_result sa_stop_device_blocking(sa_device *device) {
+    if(device->state != SA_DEVICE_STOPPED)
+        if(stop_alsa_device(device) == SA_SUCCESS)
+        { return wait_for_stop_alsa_device(device); }
+    return SA_INVALID_STATE;
 }
 
 extern sa_result sa_pause_device(sa_device *device) {
@@ -574,7 +621,7 @@ static sa_result init_alsa_device(sa_device *device) {
 
     if(prepare_playback_thread(device) != SA_SUCCESS)
     {
-        SA_LOG(ERROR, "Failed to perpare the playback thread");
+        SA_LOG(ERROR, "Failed to prepare the playback thread");
         exit(EXIT_FAILURE);
     }
     return SA_SUCCESS;
@@ -650,7 +697,7 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     device->buffer_size = size;
     /* Set the period time */
     err                 = snd_pcm_hw_params_set_period_time_near(device->handle, device->hw_params,
-                                                                 (unsigned int *) &(device->config->period_time), &dir);
+                                                 (unsigned int *) &(device->config->period_time), &dir);
     if(err < 0)
     {
         SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
@@ -743,10 +790,15 @@ static sa_result prepare_playback_thread(sa_device *device) {
     struct pollfd *pipe_read_end_fd = (struct pollfd *) malloc(sizeof(struct pollfd));
     pipe_read_end_fd->fd            = pipe_fds[0];
     pipe_read_end_fd->events        = POLLIN;
+    /** Prepare the condition variable*/
+    device->condition_var           = (sa_condition_variable *) malloc(sizeof(sa_condition_variable));
+    pthread_mutex_init(&(device->condition_var->mutex), NULL);
+    pthread_cond_init(&(device->condition_var->cond), NULL);
+    device->condition_var->is_stopped = true;
     /** Startup the playback thread */
-    sa_thread_data *thread_data     = (sa_thread_data *) malloc(sizeof(sa_thread_data));
-    thread_data->device             = device;
-    thread_data->pipe_read_end_fd   = pipe_read_end_fd;
+    sa_thread_data *thread_data       = (sa_thread_data *) malloc(sizeof(sa_thread_data));
+    thread_data->device               = device;
+    thread_data->pipe_read_end_fd     = pipe_read_end_fd;
     if(pthread_create(&device->playback_thread, NULL, &init_playback_thread, (void *) thread_data) != 0)
     {
         SA_LOG(ERROR, "Failed to create the playback thread");
@@ -785,27 +837,28 @@ static void *init_playback_thread(void *data) {
                 /** Play command */
                 case 'u':
                     {
-                        device->state = SA_DEVICE_STARTED;
+                        /** Save state */
+                        save_device_state(device, SA_DEVICE_STARTED);
+                        /** Start playback */
                         sa_result res = start_write_and_poll_loop(device, pipe_read_end_fd);
                         /** The write and poll loop can end in three ways: error, a stop command is sent, or
-                         * no more audio is send to the audiobuffer */
+                         * no more audio is send to the audio buffer */
                         if(res == SA_ERROR)
                         {
-                            device->state = SA_DEVICE_STOPPED;
+                            save_device_state(device, SA_DEVICE_STOPPED);
                             break;
-                        }
-                        if(res == SA_STOP)
+                        } else if(res == SA_STOP)
                         {
                             drop_alsa_device(device);
                             prepare_alsa_device(device);
-                            device->state = SA_DEVICE_STOPPED;
-                        }
-                        if(res == SA_AT_END)
+                            save_device_state(device, SA_DEVICE_STOPPED);
+
+                        } else if(res == SA_AT_END)
                         {
                             /** Received no frames anymore from the callback so we stop and prepare the alsa device again */
                             drain_alsa_device(device);
                             prepare_alsa_device(device);
-                            device->state = SA_DEVICE_STOPPED;
+                            save_device_state(device, SA_DEVICE_STOPPED);
                             /** Signal eof */
                             void (*eof_callback)(sa_device * sa_device, void *my_custom_data) =
                               (void (*)(sa_device *, void *my_custom_data)) device->config->eof_callback;
@@ -1050,14 +1103,14 @@ static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device
             /** Stop playback */
             case 's':
                 {
-                    device->state = SA_DEVICE_STOPPED;
+                    save_device_state(device, SA_DEVICE_STOPPED);
                     return SA_STOP;
                     break;
                 }
             /** Unpause */
             case 'u':
                 {
-                    device->state = SA_DEVICE_STARTED;
+                    save_device_state(device, SA_DEVICE_STARTED);
                     return SA_UNPAUSE;
                     break;
                 }
@@ -1067,6 +1120,19 @@ static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device
         }
     }
     return SA_ERROR;
+}
+
+static void save_device_state(sa_device *device, sa_device_state new_state) {
+    /** Save state */
+    device->state = new_state;
+    pthread_mutex_lock(&(device->condition_var->mutex));
+    device->condition_var->is_stopped = new_state == SA_DEVICE_STOPPED;
+    pthread_mutex_unlock(&(device->condition_var->mutex));
+    if(device->condition_var->is_stopped)
+    {
+        /** Broadcast stoppage*/
+        pthread_cond_signal(&(device->condition_var->cond));
+    }
 }
 
 static sa_result xrun_recovery(snd_pcm_t *handle, int err) {
@@ -1124,6 +1190,14 @@ static sa_result stop_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send cancel command to the message pipe");
         return SA_ERROR;
     };
+    return SA_SUCCESS;
+}
+
+static sa_result wait_for_stop_alsa_device(sa_device *device) {
+    pthread_mutex_lock(&(device->condition_var->mutex));
+    while(!(device->condition_var->is_stopped))
+    { pthread_cond_wait(&(device->condition_var->cond), &(device->condition_var->mutex)); }
+    pthread_mutex_unlock(&(device->condition_var->mutex));
     return SA_SUCCESS;
 }
 
@@ -1215,6 +1289,12 @@ static sa_result cleanup_device(sa_device *device) {
 
         if(device->config)
         { free(device->config); }
+        if(device->condition_var)
+        {
+            pthread_mutex_destroy(&(device->condition_var->mutex));
+            pthread_cond_destroy(&(device->condition_var->cond));
+            free(device->condition_var);
+        }
 
         if(device->samples)
         { free(device->samples); }
