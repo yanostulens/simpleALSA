@@ -85,10 +85,9 @@ int main(int argc, char const *argv[]) {
                 sa_stop_device_blocking(device);
                 printf("State = %i\n", device->state);
                 sf_seek(infile, 0, SEEK_SET);
-            }
-            else{
-                printf("%s\n", input);
-            }
+            } else
+            { printf("%s\n", input); }
+            { printf("State = %i\n", sa_get_device_state(device)); }
         }
     }
     sf_close(infile);
