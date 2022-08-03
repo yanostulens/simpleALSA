@@ -749,7 +749,7 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     device->buffer_size = size;
     /* Set the period time */
     err                 = snd_pcm_hw_params_set_period_time_near(device->handle, device->hw_params,
-                                                                 (unsigned int *) &(device->config->period_time), &dir);
+                                                 (unsigned int *) &(device->config->period_time), &dir);
     if(err < 0)
     {
         SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
@@ -1116,7 +1116,7 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                         if(res == SA_UNPAUSE)
                         {
                             unpause_PCM_handle(device);
-                            device->state = SA_DEVICE_STARTED;
+                            save_device_state(device, SA_DEVICE_STARTED);
                         }
 
                         break;
@@ -1164,7 +1164,6 @@ static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device
             /** Unpause */
             case 'u':
                 {
-                    save_device_state(device, SA_DEVICE_STARTED);
                     return SA_UNPAUSE;
                     break;
                 }
@@ -1182,11 +1181,8 @@ static void save_device_state(sa_device *device, sa_device_state new_state) {
     pthread_mutex_lock(&(device->condition_var->mutex));
     device->condition_var->is_stopped = new_state == SA_DEVICE_STOPPED;
     pthread_mutex_unlock(&(device->condition_var->mutex));
-    if(device->condition_var->is_stopped)
-    {
-        /** Broadcast stoppage*/
-        pthread_cond_signal(&(device->condition_var->cond));
-    }
+    /** Broadcast change*/
+    pthread_cond_signal(&(device->condition_var->cond));
 }
 
 static sa_result xrun_recovery(snd_pcm_t *handle, int err) {
@@ -1241,7 +1237,7 @@ static sa_result unpause_alsa_device(sa_device *device) {
 }
 
 static sa_result wait_for_start_alsa_device(sa_device *device) {
-    while(!(device->condition_var->is_stopped))
+    while((device->condition_var->is_stopped))
     { pthread_cond_wait(&(device->condition_var->cond), &(device->condition_var->mutex)); }
     return SA_SUCCESS;
 }
