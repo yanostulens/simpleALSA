@@ -244,6 +244,14 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device);
 extern sa_result sa_start_device(sa_device *device);
 
 /**
+ * @brief starts the simple ALSA device - which starts the callback loop
+ *
+ * @param device - device to start
+ * @return sa_return_status
+ */
+extern sa_result sa_start_device_blocking(sa_device *device);
+
+/**
  * @brief pauses the simple ALSA device - which pauses the callback loop
  *
  * @param device - device to pause
@@ -318,6 +326,14 @@ static sa_result prepare_playback_thread(sa_device *device);
  * @return sa_result
  */
 static sa_result start_alsa_device(sa_device *device);
+
+/**
+ * @brief Waits until the transfer loop starts
+ *
+ * @param device
+ * @return sa_result
+ */
+static sa_result wait_for_start_alsa_device(sa_device *device);
 
 /**
  * @brief Sends out a message to the transfer loop to pause audio output
@@ -533,6 +549,19 @@ extern sa_result sa_start_device(sa_device *device) {
         return SA_INVALID_STATE;
 }
 
+extern sa_result sa_start_device_blocking(sa_device *device) {
+    pthread_mutex_lock(&(device->condition_var->mutex));
+    if(device->state != SA_DEVICE_STARTED)
+        if(start_alsa_device(device) == SA_SUCCESS)
+        {
+            sa_result result = wait_for_start_alsa_device(device);
+            pthread_mutex_unlock(&(device->condition_var->mutex));
+            return result;
+        }
+    pthread_mutex_unlock(&(device->condition_var->mutex));
+    return SA_INVALID_STATE;
+}
+
 extern sa_result sa_stop_device(sa_device *device) {
     if(device->state != SA_DEVICE_STOPPED)
         return stop_alsa_device(device);
@@ -540,9 +569,17 @@ extern sa_result sa_stop_device(sa_device *device) {
         return SA_INVALID_STATE;
 }
 extern sa_result sa_stop_device_blocking(sa_device *device) {
+    pthread_mutex_lock(&(device->condition_var->mutex));
     if(device->state != SA_DEVICE_STOPPED)
+    {
         if(stop_alsa_device(device) == SA_SUCCESS)
-        { return wait_for_stop_alsa_device(device); }
+        {
+            sa_result result = wait_for_stop_alsa_device(device);
+            pthread_mutex_unlock(&(device->condition_var->mutex));
+            return result;
+        }
+    }
+    pthread_mutex_unlock(&(device->condition_var->mutex));
     return SA_INVALID_STATE;
 }
 
@@ -1049,7 +1086,7 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
             {
                 switch(command)
                 {
-                /** Stop playack */
+                /** Stop playback */
                 case 's':
                     return SA_STOP;
                     break;
@@ -1103,7 +1140,6 @@ static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device
             /** Stop playback */
             case 's':
                 {
-                    save_device_state(device, SA_DEVICE_STOPPED);
                     return SA_STOP;
                     break;
                 }
@@ -1184,6 +1220,12 @@ static sa_result unpause_alsa_device(sa_device *device) {
     return SA_SUCCESS;
 }
 
+static sa_result wait_for_start_alsa_device(sa_device *device) {
+    while(!(device->condition_var->is_stopped))
+    { pthread_cond_wait(&(device->condition_var->cond), &(device->condition_var->mutex)); }
+    return SA_SUCCESS;
+}
+
 static sa_result stop_alsa_device(sa_device *device) {
     if(message_pipe(device, 's') == SA_ERROR)
     {
@@ -1194,10 +1236,8 @@ static sa_result stop_alsa_device(sa_device *device) {
 }
 
 static sa_result wait_for_stop_alsa_device(sa_device *device) {
-    pthread_mutex_lock(&(device->condition_var->mutex));
     while(!(device->condition_var->is_stopped))
     { pthread_cond_wait(&(device->condition_var->cond), &(device->condition_var->mutex)); }
-    pthread_mutex_unlock(&(device->condition_var->mutex));
     return SA_SUCCESS;
 }
 
