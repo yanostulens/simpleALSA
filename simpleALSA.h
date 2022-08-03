@@ -283,6 +283,8 @@ extern sa_result sa_stop_device_blocking(sa_device *device);
  */
 extern sa_result sa_destroy_device(sa_device *device);
 
+extern sa_device_state sa_get_device_state(sa_device *device);
+
 /*=========================== LOG DECLARATIONS ===========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
@@ -544,9 +546,13 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
 
 extern sa_result sa_start_device(sa_device *device) {
     if(device->state != SA_DEVICE_STARTED)
+    {
         return start_alsa_device(device);
-    else
+    } else
+    {
+        SA_LOG(ERROR, "Unable to start the device, the device is already started");
         return SA_INVALID_STATE;
+    }
 }
 
 extern sa_result sa_start_device_blocking(sa_device *device) {
@@ -566,7 +572,10 @@ extern sa_result sa_stop_device(sa_device *device) {
     if(device->state != SA_DEVICE_STOPPED)
         return stop_alsa_device(device);
     else
+    {
+        SA_LOG(ERROR, "Unable to stop the device, the device is already stopped");
         return SA_INVALID_STATE;
+    }
 }
 extern sa_result sa_stop_device_blocking(sa_device *device) {
     pthread_mutex_lock(&(device->condition_var->mutex));
@@ -587,30 +596,36 @@ extern sa_result sa_pause_device(sa_device *device) {
     if(device->state == SA_DEVICE_STARTED)
         return pause_alsa_device(device);
     else
+    {
+        SA_LOG(ERROR, "Unable to pause the device, the device is already ");
         return SA_INVALID_STATE;
+    }
 }
 
 extern sa_result sa_destroy_device(sa_device *device) {
     return destroy_alsa_device(device);
 }
 
+extern sa_device_state sa_get_device_state(sa_device *device) {
+    return device->state;
+}
 /*========================= LOG DEFINITIONS ==========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     switch(type)
     {
     #ifndef SA_NO_ERROR_LOGS
     case ERROR:
-        printf("\e[1;31m[  ERROR   ] \e[0m %s %s\n", msg0, msg1);
+        printf("\e[1;31m[  SA ERROR   ] \e[0m %s %s\n", msg0, msg1);
         break;
     #endif
     #ifndef SA_NO_WARNING_LOGS
     case WARNING:
-        printf("\e[1;33m[  WARNING ] \e[0m %s %s\n", msg0, msg1);
+        printf("\e[1;33m[  SA WARNING ] \e[0m %s %s\n", msg0, msg1);
         break;
     #endif
     #ifndef SA_NO_DEBUG_LOGS
     case DEBUG:
-        printf("\e[1;35m[  DEBUG   ] \e[0m %s %s\n", msg0, msg1);
+        printf("\e[1;35m[  SA DEBUG   ] \e[0m %s %s\n", msg0, msg1);
         break;
     #endif
     default:
@@ -734,7 +749,7 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     device->buffer_size = size;
     /* Set the period time */
     err                 = snd_pcm_hw_params_set_period_time_near(device->handle, device->hw_params,
-                                                 (unsigned int *) &(device->config->period_time), &dir);
+                                                                 (unsigned int *) &(device->config->period_time), &dir);
     if(err < 0)
     {
         SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
@@ -907,7 +922,7 @@ static void *init_playback_thread(void *data) {
                 case 'd':
                     break;
                 default:
-                    SA_LOG(WARNING, "Command sent to the pipe is ignored");
+                    SA_LOG(DEBUG, "Command sent to the pipe is ignored");
                     continue;
                 }
                 SA_LOG(DEBUG, "Attempting to destroy the device");
@@ -1093,18 +1108,21 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 /** Pause playback */
                 case 'p':
                     {
-                        device->state = SA_DEVICE_PAUSED;
                         sa_result res = pause_callback_loop(poll_manager, device);
                         /** The 'paused' state can end in 2 ways: either a stop command kills the device or an unpause command resumes playback */
                         if(res == SA_STOP)
-                            return SA_STOP;
+                        { return SA_STOP; }
+
                         if(res == SA_UNPAUSE)
+                        {
                             unpause_PCM_handle(device);
-                        device->state = SA_DEVICE_STARTED;
+                            device->state = SA_DEVICE_STARTED;
+                        }
+
                         break;
                     }
                 default:
-                    SA_LOG(WARNING, "Command send to the pipe is ignored");
+                    SA_LOG(DEBUG, "Command sent to the pipe is ignored");
                     break;
                 }
             }
@@ -1208,6 +1226,7 @@ static sa_result pause_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send pause command to the message pipe");
         return SA_ERROR;
     };
+    device->state = SA_DEVICE_PAUSED;
     return SA_SUCCESS;
 }
 
@@ -1217,6 +1236,7 @@ static sa_result unpause_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send unpause command to the message pipe");
         return SA_ERROR;
     };
+    device->state = SA_DEVICE_STARTED;
     return SA_SUCCESS;
 }
 
@@ -1232,6 +1252,7 @@ static sa_result stop_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send cancel command to the message pipe");
         return SA_ERROR;
     };
+    device->state = SA_DEVICE_STOPPED;
     return SA_SUCCESS;
 }
 
