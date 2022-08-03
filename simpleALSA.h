@@ -1368,7 +1368,7 @@ static sa_result cleanup_device(sa_device *device) {
 }
 
 static sa_result destroy_alsa_device(sa_device *device) {
-    stop_alsa_device(device);
+    sa_stop_device_blocking(device);
     message_pipe(device, 'd');
     if(close_playback_thread(device) == SA_ERROR)
     {
