@@ -6,4 +6,4 @@ Want to give it a try? Have a look at the example.c file! Make sure to compile w
 
 At the moment simpleALSA.h is working, it is however still under construction, so the API might still change.
 
-Credits must be given to the miniaudio library (https://github.com/mackron/miniaudio), as simpleALSA work in a similar way.
+Credits must be given to the miniaudio library (https://github.com/mackron/miniaudio), as simpleALSA works in a similar way.
