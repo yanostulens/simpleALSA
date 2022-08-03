@@ -99,6 +99,9 @@ struct sa_device
     /** State of the device */
     sa_device_state state;
 
+    /** Mutex to protect the state */
+    pthread_mutex_t stateMutex;
+
     /** Pointer to the configuration settings of the device*/
     sa_device_config *config;
 
@@ -237,19 +240,20 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device);
 
 /**
  * @brief starts the simple ALSA device - which starts the callback loop
- *
+ * This function will return directly which means there is no guarantee about the state after a call to this function
+ * @param device - device to start
+ * @return sa_return_status
+ */
+static sa_result sa_start_device_async(sa_device *device);
+
+/**
+ * @brief starts the simple ALSA device - which starts the callback loop
+ * This function will block untill the device is actually stopped.
+
  * @param device - device to start
  * @return sa_return_status
  */
 extern sa_result sa_start_device(sa_device *device);
-
-/**
- * @brief starts the simple ALSA device - which starts the callback loop
- *
- * @param device - device to start
- * @return sa_return_status
- */
-extern sa_result sa_start_device_blocking(sa_device *device);
 
 /**
  * @brief pauses the simple ALSA device - which pauses the callback loop
@@ -261,19 +265,21 @@ extern sa_result sa_pause_device(sa_device *device);
 
 /**
  * @brief stops a simple ALSA device - same as pause but in addition, all buffer data is dropped
+ * This function will return directly which means there is no guarantee about the state after a call to this function
+ *
+ * @param device - device to stop
+ * @return sa_return_status
+ */
+static sa_result sa_stop_device_async(sa_device *device);
+
+/**
+ * @brief stops a simple ALSA device - same sa_stop_device, but blocks until the devices has actually stopped
+ * This function will block untill the device is actually stopped.
  *
  * @param device - device to stop
  * @return sa_return_status
  */
 extern sa_result sa_stop_device(sa_device *device);
-
-/**
- * @brief stops a simple ALSA device - same sa_stop_device, but blocks until the devices has actually stopped
- *
- * @param device - device to stop
- * @return sa_return_status
- */
-extern sa_result sa_stop_device_blocking(sa_device *device);
 
 /**
  * @brief destroys the device - device pointer is set to NULL
@@ -283,6 +289,12 @@ extern sa_result sa_stop_device_blocking(sa_device *device);
  */
 extern sa_result sa_destroy_device(sa_device *device);
 
+/**
+ * @brief function used to retrieve the device state in a thread safe manner
+ *
+ * @param device
+ * @return sa_device_state
+ */
 extern sa_device_state sa_get_device_state(sa_device *device);
 
 /*=========================== LOG DECLARATIONS ===========================*/
@@ -516,6 +528,14 @@ static sa_result prepare_alsa_device(sa_device *device);
  */
 static sa_result destroy_alsa_device(sa_device *device);
 
+/**
+ * @brief Function used to set the device state - thread safe
+ *
+ * @param device
+ * @param state
+ */
+static void sa_set_device_state(sa_device *device, sa_device_state state);
+
 /*========================= API DEFINITIONS ==========================*/
 extern sa_result sa_init_device_config(sa_device_config **config) {
     sa_device_config *config_temp = (sa_device_config *) malloc(sizeof(sa_device_config));
@@ -544,8 +564,8 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     return init_alsa_device(*device);
 }
 
-extern sa_result sa_start_device(sa_device *device) {
-    if(device->state != SA_DEVICE_STARTED)
+static sa_result sa_start_device_async(sa_device *device) {
+    if(sa_get_device_state(device) != SA_DEVICE_STARTED)
     {
         return start_alsa_device(device);
     } else
@@ -555,9 +575,9 @@ extern sa_result sa_start_device(sa_device *device) {
     }
 }
 
-extern sa_result sa_start_device_blocking(sa_device *device) {
+extern sa_result sa_start_device(sa_device *device) {
     pthread_mutex_lock(&(device->condition_var->mutex));
-    if(device->state != SA_DEVICE_STARTED)
+    if(sa_get_device_state(device) != SA_DEVICE_STARTED)
         if(start_alsa_device(device) == SA_SUCCESS)
         {
             sa_result result = wait_for_start_alsa_device(device);
@@ -568,8 +588,8 @@ extern sa_result sa_start_device_blocking(sa_device *device) {
     return SA_INVALID_STATE;
 }
 
-extern sa_result sa_stop_device(sa_device *device) {
-    if(device->state != SA_DEVICE_STOPPED)
+static sa_result sa_stop_device_async(sa_device *device) {
+    if(sa_get_device_state(device) != SA_DEVICE_STOPPED)
         return stop_alsa_device(device);
     else
     {
@@ -577,9 +597,10 @@ extern sa_result sa_stop_device(sa_device *device) {
         return SA_INVALID_STATE;
     }
 }
-extern sa_result sa_stop_device_blocking(sa_device *device) {
+
+extern sa_result sa_stop_device(sa_device *device) {
     pthread_mutex_lock(&(device->condition_var->mutex));
-    if(device->state != SA_DEVICE_STOPPED)
+    if(sa_get_device_state(device) != SA_DEVICE_STOPPED)
     {
         if(stop_alsa_device(device) == SA_SUCCESS)
         {
@@ -593,7 +614,7 @@ extern sa_result sa_stop_device_blocking(sa_device *device) {
 }
 
 extern sa_result sa_pause_device(sa_device *device) {
-    if(device->state == SA_DEVICE_STARTED)
+    if(sa_get_device_state(device) == SA_DEVICE_STARTED)
         return pause_alsa_device(device);
     else
     {
@@ -607,7 +628,10 @@ extern sa_result sa_destroy_device(sa_device *device) {
 }
 
 extern sa_device_state sa_get_device_state(sa_device *device) {
-    return device->state;
+    pthread_mutex_lock(&(device->stateMutex));
+    sa_device_state result = device->state;
+    pthread_mutex_unlock(&(device->stateMutex));
+    return result;
 }
 /*========================= LOG DEFINITIONS ==========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
@@ -749,7 +773,7 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     device->buffer_size = size;
     /* Set the period time */
     err                 = snd_pcm_hw_params_set_period_time_near(device->handle, device->hw_params,
-                                                 (unsigned int *) &(device->config->period_time), &dir);
+                                                                 (unsigned int *) &(device->config->period_time), &dir);
     if(err < 0)
     {
         SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
@@ -1177,7 +1201,7 @@ static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device
 
 static void save_device_state(sa_device *device, sa_device_state new_state) {
     /** Save state */
-    device->state = new_state;
+    sa_set_device_state(device, new_state);
     pthread_mutex_lock(&(device->condition_var->mutex));
     device->condition_var->is_stopped = new_state == SA_DEVICE_STOPPED;
     pthread_mutex_unlock(&(device->condition_var->mutex));
@@ -1222,7 +1246,7 @@ static sa_result pause_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send pause command to the message pipe");
         return SA_ERROR;
     };
-    device->state = SA_DEVICE_PAUSED;
+    sa_set_device_state(device, SA_DEVICE_PAUSED);
     return SA_SUCCESS;
 }
 
@@ -1232,7 +1256,7 @@ static sa_result unpause_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send unpause command to the message pipe");
         return SA_ERROR;
     };
-    device->state = SA_DEVICE_STARTED;
+    sa_set_device_state(device, SA_DEVICE_STARTED);
     return SA_SUCCESS;
 }
 
@@ -1248,7 +1272,7 @@ static sa_result stop_alsa_device(sa_device *device) {
         SA_LOG(ERROR, "Could not send cancel command to the message pipe");
         return SA_ERROR;
     };
-    device->state = SA_DEVICE_STOPPED;
+    sa_set_device_state(device, SA_DEVICE_STOPPED);
     return SA_SUCCESS;
 }
 
@@ -1368,7 +1392,7 @@ static sa_result cleanup_device(sa_device *device) {
 }
 
 static sa_result destroy_alsa_device(sa_device *device) {
-    sa_stop_device_blocking(device);
+    sa_stop_device(device);
     message_pipe(device, 'd');
     if(close_playback_thread(device) == SA_ERROR)
     {
@@ -1377,5 +1401,12 @@ static sa_result destroy_alsa_device(sa_device *device) {
     }
     return cleanup_device(device);
 }
+
+static void sa_set_device_state(sa_device *device, sa_device_state state) {
+    pthread_mutex_lock(&(device->stateMutex));
+    device->state = state;
+    pthread_mutex_unlock(&(device->stateMutex));
+}
+
 #endif  // SA_IMPLEMENTATION
 #endif  // SIMPLEALSA_H
