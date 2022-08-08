@@ -81,9 +81,9 @@ typedef enum sa_device_state
  */
 typedef enum
 {
-    DEBUG   = 0,
-    WARNING = 1,
-    ERROR   = 2
+    SA_LOG_LEVEL_DEBUG   = 0,
+    SA_LOG_LEVEL_WARNING = 1,
+    SA_LOG_LEVEL_ERROR   = 2
 } sa_log_type;
 
 /*=============================== STRUCTS ===============================*/
@@ -240,14 +240,6 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device);
 
 /**
  * @brief starts the simple ALSA device - which starts the callback loop
- * This function will return directly which means there is no guarantee about the state after a call to this function
- * @param device - device to start
- * @return sa_return_status
- */
-static sa_result sa_start_device_async(sa_device *device);
-
-/**
- * @brief starts the simple ALSA device - which starts the callback loop
  * This function will block untill the device is actually stopped.
 
  * @param device - device to start
@@ -263,6 +255,8 @@ extern sa_result sa_start_device(sa_device *device);
  */
 extern sa_result sa_pause_device(sa_device *device);
 
+    #ifdef SA_ASYNC_API
+
 /**
  * @brief stops a simple ALSA device - same as pause but in addition, all buffer data is dropped
  * This function will return directly which means there is no guarantee about the state after a call to this function
@@ -270,7 +264,17 @@ extern sa_result sa_pause_device(sa_device *device);
  * @param device - device to stop
  * @return sa_return_status
  */
-static sa_result sa_stop_device_async(sa_device *device);
+extern sa_result sa_stop_device_async(sa_device *device);
+
+/**
+ * @brief starts the simple ALSA device - which starts the callback loop
+ * This function will return directly which means there is no guarantee about the state after a call to this function
+ * @param device - device to start
+ * @return sa_return_status
+ */
+extern sa_result sa_start_device_async(sa_device *device);
+
+    #endif
 
 /**
  * @brief stops a simple ALSA device - same sa_stop_device, but blocks until the devices has actually stopped
@@ -564,16 +568,30 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     return init_alsa_device(*device);
 }
 
+    #ifdef SA_ASYNC_API
+
 static sa_result sa_start_device_async(sa_device *device) {
     if(sa_get_device_state(device) != SA_DEVICE_STARTED)
     {
         return start_alsa_device(device);
     } else
     {
-        SA_LOG(ERROR, "Unable to start the device, the device is already started");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Unable to start the device, the device is already started");
         return SA_INVALID_STATE;
     }
 }
+
+static sa_result sa_stop_device_async(sa_device *device) {
+    if(sa_get_device_state(device) != SA_DEVICE_STOPPED)
+        return stop_alsa_device(device);
+    else
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Unable to stop the device, the device is already stopped");
+        return SA_INVALID_STATE;
+    }
+}
+
+    #endif
 
 extern sa_result sa_start_device(sa_device *device) {
     pthread_mutex_lock(&(device->condition_var->mutex));
@@ -586,16 +604,6 @@ extern sa_result sa_start_device(sa_device *device) {
         }
     pthread_mutex_unlock(&(device->condition_var->mutex));
     return SA_INVALID_STATE;
-}
-
-static sa_result sa_stop_device_async(sa_device *device) {
-    if(sa_get_device_state(device) != SA_DEVICE_STOPPED)
-        return stop_alsa_device(device);
-    else
-    {
-        SA_LOG(ERROR, "Unable to stop the device, the device is already stopped");
-        return SA_INVALID_STATE;
-    }
 }
 
 extern sa_result sa_stop_device(sa_device *device) {
@@ -618,7 +626,7 @@ extern sa_result sa_pause_device(sa_device *device) {
         return pause_alsa_device(device);
     else
     {
-        SA_LOG(ERROR, "Unable to pause the device, the device is already ");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Unable to pause the device, the device is already ");
         return SA_INVALID_STATE;
     }
 }
@@ -638,17 +646,17 @@ static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     switch(type)
     {
     #ifndef SA_NO_ERROR_LOGS
-    case ERROR:
+    case SA_LOG_LEVEL_ERROR:
         printf("\e[1;31m[  SA ERROR   ] \e[0m %s %s\n", msg0, msg1);
         break;
     #endif
     #ifndef SA_NO_WARNING_LOGS
-    case WARNING:
+    case SA_LOG_LEVEL_WARNING:
         printf("\e[1;33m[  SA WARNING ] \e[0m %s %s\n", msg0, msg1);
         break;
     #endif
     #ifndef SA_NO_DEBUG_LOGS
-    case DEBUG:
+    case SA_LOG_LEVEL_DEBUG:
         printf("\e[1;35m[  SA DEBUG   ] \e[0m %s %s\n", msg0, msg1);
         break;
     #endif
@@ -666,18 +674,18 @@ static sa_result init_alsa_device(sa_device *device) {
 
     if((err = snd_pcm_open(&(device->handle), device->config->device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
     {
-        SA_LOG(ERROR, "ALSA: playback open error:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: playback open error:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
 
     if((err = set_hardware_parameters(device, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
     {
-        SA_LOG(ERROR, "ALSA: setting hardware parameters failed:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: setting hardware parameters failed:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
     if((err = set_software_parameters(device)) < 0)
     {
-        SA_LOG(ERROR, "ALSA: setting software parameters failed:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: setting software parameters failed:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
 
@@ -691,13 +699,13 @@ static sa_result init_alsa_device(sa_device *device) {
     device->supports_pause = snd_pcm_hw_params_can_pause(device->hw_params);
     if(device->supports_pause)
     {
-        SA_LOG(DEBUG, "Device supports snd_pcm_pause()");
+        SA_LOG(SA_LOG_LEVEL_DEBUG, "Device supports snd_pcm_pause()");
     } else
-    { SA_LOG(DEBUG, "Device does not support snd_pcm_pause()"); }
+    { SA_LOG(SA_LOG_LEVEL_DEBUG, "Device does not support snd_pcm_pause()"); }
 
     if(prepare_playback_thread(device) != SA_SUCCESS)
     {
-        SA_LOG(ERROR, "Failed to prepare the playback thread");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to prepare the playback thread");
         exit(EXIT_FAILURE);
     }
     return SA_SUCCESS;
@@ -711,7 +719,7 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     err = snd_pcm_hw_params_any(device->handle, device->hw_params);
     if(err < 0)
     {
-        SA_LOG(ERROR,
+        SA_LOG(SA_LOG_LEVEL_ERROR,
                "ALSA: broken configuration for playback: no configurations available:", snd_strerror(err));
         return SA_ERROR;
     }
@@ -719,28 +727,28 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     err = snd_pcm_hw_params_set_rate_resample(device->handle, device->hw_params, 1);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: resampling setup failed for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: resampling setup failed for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     /* Set the interleaved read/write format */
     err = snd_pcm_hw_params_set_access(device->handle, device->hw_params, access);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: access type not available for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: access type not available for playback", snd_strerror(err));
         return SA_ERROR;
     }
     /* Set the sample format */
     err = snd_pcm_hw_params_set_format(device->handle, device->hw_params, device->config->format);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: sample format not available for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: sample format not available for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     /* Set the count of channels */
     err = snd_pcm_hw_params_set_channels(device->handle, device->hw_params, device->config->channels);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: channels count not available for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: channels count not available for playback", snd_strerror(err));
         return SA_ERROR;
     }
     /* Set the stream rate */
@@ -748,12 +756,12 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     err   = snd_pcm_hw_params_set_rate_near(device->handle, device->hw_params, &rrate, 0);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: sample_rate not available for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: sample_rate not available for playback", snd_strerror(err));
         return SA_ERROR;
     }
     if(rrate != device->config->sample_rate)
     {
-        SA_LOG(ERROR, "ALSA: sample rate does not match the requested rate");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: sample rate does not match the requested rate");
         return SA_ERROR;
     }
     /* Set the buffer time */
@@ -761,13 +769,13 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
                                                  (unsigned int *) &(device->config->buffer_time), &dir);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to set the buffer time for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to set the buffer time for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     err = snd_pcm_hw_params_get_buffer_size(device->hw_params, &size);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to get the buffer size for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to get the buffer size for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     device->buffer_size = size;
@@ -776,13 +784,13 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
                                                                  (unsigned int *) &(device->config->period_time), &dir);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to set the period time for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     err = snd_pcm_hw_params_get_period_size(device->hw_params, &size, &dir);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to get period size for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to get period size for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     device->period_size = size;
@@ -790,7 +798,8 @@ static sa_result set_hardware_parameters(sa_device *device, snd_pcm_access_t acc
     err                 = snd_pcm_hw_params(device->handle, device->hw_params);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to set hardware parameters for playback:", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR,
+               "ALSA: unable to set hardware parameters for playback:", snd_strerror(err));
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -803,7 +812,7 @@ static sa_result set_software_parameters(sa_device *device) {
     err = snd_pcm_sw_params_current(device->handle, device->sw_params);
     if(err < 0)
     {
-        SA_LOG(ERROR,
+        SA_LOG(SA_LOG_LEVEL_ERROR,
                "ALSA: unable to determine current software parameters for playback:", snd_strerror(err));
         return SA_ERROR;
     }
@@ -812,7 +821,8 @@ static sa_result set_software_parameters(sa_device *device) {
       device->handle, device->sw_params, (device->buffer_size / device->period_size) * device->period_size);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to start set threshold mode for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to start set threshold mode for playback",
+               snd_strerror(err));
         return SA_ERROR;
     }
     /* Allow the transfer when at least period_size samples can be processed */
@@ -821,7 +831,7 @@ static sa_result set_software_parameters(sa_device *device) {
                                           0 ? device->buffer_size : device->period_size);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to set available minimum for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to set available minimum for playback", snd_strerror(err));
         return SA_ERROR;
     }
     /* Enable period events when requested */
@@ -830,7 +840,7 @@ static sa_result set_software_parameters(sa_device *device) {
         err = snd_pcm_sw_params_set_period_event(device->handle, device->sw_params, 1);
         if(err < 0)
         {
-            SA_LOG(ERROR, "ALSA: unable to set period event", snd_strerror(err));
+            SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to set period event", snd_strerror(err));
             return SA_ERROR;
         }
     }
@@ -838,7 +848,7 @@ static sa_result set_software_parameters(sa_device *device) {
     err = snd_pcm_sw_params(device->handle, device->sw_params);
     if(err < 0)
     {
-        SA_LOG(ERROR, "ALSA: unable to set software parameters for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: unable to set software parameters for playback", snd_strerror(err));
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -849,13 +859,13 @@ static sa_result prepare_playback_thread(sa_device *device) {
     int pipe_fds[2];
     if(pipe(pipe_fds))
     {
-        SA_LOG(ERROR, "Cannot create poll_pipe");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Cannot create poll_pipe");
         return SA_ERROR;
     }
     /** Makes read end nonblocking */
     if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
     {
-        SA_LOG(ERROR, "Failed to make pipe non-blocking");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to make pipe non-blocking");
         close(pipe_fds[0]);
         close(pipe_fds[1]);
         return SA_ERROR;
@@ -871,13 +881,15 @@ static sa_result prepare_playback_thread(sa_device *device) {
     pthread_mutex_init(&(device->condition_var->mutex), NULL);
     pthread_cond_init(&(device->condition_var->cond), NULL);
     device->condition_var->is_stopped = true;
+    /** Prepare stateMutex */
+    pthread_mutex_init(&(device->stateMutex), NULL);
     /** Startup the playback thread */
-    sa_thread_data *thread_data       = (sa_thread_data *) malloc(sizeof(sa_thread_data));
-    thread_data->device               = device;
-    thread_data->pipe_read_end_fd     = pipe_read_end_fd;
+    sa_thread_data *thread_data   = (sa_thread_data *) malloc(sizeof(sa_thread_data));
+    thread_data->device           = device;
+    thread_data->pipe_read_end_fd = pipe_read_end_fd;
     if(pthread_create(&device->playback_thread, NULL, &init_playback_thread, (void *) thread_data) != 0)
     {
-        SA_LOG(ERROR, "Failed to create the playback thread");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to create the playback thread");
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -905,7 +917,7 @@ static void *init_playback_thread(void *data) {
         {
             if(read(pipe_read_end_fd->fd, &command, 1) != 1)
             {
-                SA_LOG(ERROR, "Pipe read error");
+                SA_LOG(SA_LOG_LEVEL_ERROR, "Pipe read error");
             } else
             {
                 switch(command)
@@ -946,10 +958,10 @@ static void *init_playback_thread(void *data) {
                 case 'd':
                     break;
                 default:
-                    SA_LOG(DEBUG, "Command sent to the pipe is ignored");
+                    SA_LOG(SA_LOG_LEVEL_DEBUG, "Command sent to the pipe is ignored");
                     continue;
                 }
-                SA_LOG(DEBUG, "Attempting to destroy the device");
+                SA_LOG(SA_LOG_LEVEL_DEBUG, "Attempting to destroy the device");
                 break;
             }
         }
@@ -965,7 +977,7 @@ static sa_result start_write_and_poll_loop(sa_device *device, struct pollfd *pip
     /** Init the poll manager */
     if(init_poll_management(device, &poll_manager, pipe_read_end_fd) != SA_SUCCESS)
     {
-        SA_LOG(ERROR, "Could not initialize the poll manager");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Could not initialize the poll manager");
         return result;
     }
     result = write_and_poll_loop(device, poll_manager);
@@ -985,14 +997,14 @@ static sa_result init_poll_management(sa_device *device, sa_poll_management **po
     /** There must be at least one alsa descriptor */
     if(poll_manager_temp->count <= 1)
     {
-        SA_LOG(ERROR, "Invalid poll descriptor count");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Invalid poll descriptor count");
         return SA_ERROR;
     }
 
     poll_manager_temp->ufds = (struct pollfd *) malloc(sizeof(struct pollfd) * (poll_manager_temp->count));
     if(poll_manager_temp->ufds == NULL)
     {
-        SA_LOG(ERROR, "Not enough memory to allocate ufds");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Not enough memory to allocate ufds");
         return SA_ERROR;
     }
     /** Store read end of pipe in the array */
@@ -1002,7 +1014,7 @@ static sa_result init_poll_management(sa_device *device, sa_poll_management **po
     if((err = snd_pcm_poll_descriptors(device->handle, poll_manager_temp->ufds + 1,
                                        poll_manager_temp->count - 1)) < 0)
     {
-        SA_LOG(ERROR, "Unable to obtain poll descriptors for playback", snd_strerror(err));
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Unable to obtain poll descriptors for playback", snd_strerror(err));
         return SA_ERROR;
     }
     *poll_manager = poll_manager_temp;
@@ -1012,7 +1024,7 @@ static sa_result init_poll_management(sa_device *device, sa_poll_management **po
 static sa_result close_playback_thread(sa_device *device) {
     if(pthread_join(device->playback_thread, NULL) != 0)
     {
-        SA_LOG(ERROR, "Could not join playback thread");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Could not join playback thread");
         return SA_ERROR;
     }
     return SA_SUCCESS;
@@ -1037,13 +1049,13 @@ static sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
-                        SA_LOG(ERROR, "ALSA: Write error:", snd_strerror(err));
+                        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: Write error:", snd_strerror(err));
                         return SA_ERROR;
                     }
                     init = 1;
                 } else
                 {
-                    SA_LOG(ERROR, "Wait for poll failed");
+                    SA_LOG(SA_LOG_LEVEL_ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
             } else if(err == SA_STOP)
@@ -1070,7 +1082,7 @@ static sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll
             {
                 if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                 {
-                    SA_LOG(ERROR, "Write error:", snd_strerror(err));
+                    SA_LOG(SA_LOG_LEVEL_ERROR, "Write error:", snd_strerror(err));
                     return SA_ERROR;
                 }
                 init = 1;
@@ -1092,13 +1104,13 @@ static sa_result write_and_poll_loop(sa_device *device, sa_poll_management *poll
                     err = snd_pcm_state(device->handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
                     if(xrun_recovery(device->handle, err) != SA_SUCCESS)
                     {
-                        SA_LOG(ERROR, "Write error:", snd_strerror(err));
+                        SA_LOG(SA_LOG_LEVEL_ERROR, "Write error:", snd_strerror(err));
                         return SA_ERROR;
                     }
                     init = 1;
                 } else
                 {
-                    SA_LOG(ERROR, "Wait for poll failed");
+                    SA_LOG(SA_LOG_LEVEL_ERROR, "Wait for poll failed");
                     return SA_ERROR;
                 }
             } else if(err == SA_STOP)
@@ -1120,7 +1132,7 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
         {
             if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
             {
-                SA_LOG(ERROR, "Pipe read error");
+                SA_LOG(SA_LOG_LEVEL_ERROR, "Pipe read error");
             } else
             {
                 switch(command)
@@ -1146,7 +1158,7 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                         break;
                     }
                 default:
-                    SA_LOG(DEBUG, "Command sent to the pipe is ignored");
+                    SA_LOG(SA_LOG_LEVEL_DEBUG, "Command sent to the pipe is ignored");
                     break;
                 }
             }
@@ -1160,7 +1172,7 @@ static int wait_for_poll(sa_device *device, sa_poll_management *poll_manager) {
                 return SA_SUCCESS;
         }
     }
-    SA_LOG(ERROR, "Poll loop ended without proper return");
+    SA_LOG(SA_LOG_LEVEL_ERROR, "Poll loop ended without proper return");
     return -1;
 }
 
@@ -1174,7 +1186,7 @@ static sa_result pause_callback_loop(sa_poll_management *poll_manager, sa_device
         poll(&(poll_manager->ufds[0]), 1, -1);
         if(read(poll_manager->ufds[0].fd, &command, 1) != 1)
         {
-            SA_LOG(ERROR, "Pipe read error");
+            SA_LOG(SA_LOG_LEVEL_ERROR, "Pipe read error");
         } else
         {
             switch(command)
@@ -1210,13 +1222,14 @@ static void save_device_state(sa_device *device, sa_device_state new_state) {
 }
 
 static sa_result xrun_recovery(snd_pcm_t *handle, int err) {
-    SA_LOG(DEBUG, "ASLA: xrun occured");
+    SA_LOG(SA_LOG_LEVEL_DEBUG, "ASLA: xrun occured");
     if(err == -EPIPE)
     { /* Underrun */
         err = snd_pcm_prepare(handle);
         if(err < 0)
         {
-            SA_LOG(ERROR, "ALSA: Can't recover from underrun, prepare failed:", snd_strerror(err));
+            SA_LOG(SA_LOG_LEVEL_ERROR,
+                   "ALSA: Can't recover from underrun, prepare failed:", snd_strerror(err));
             return SA_ERROR;
         }
     } else if(err == -ESTRPIPE)
@@ -1231,7 +1244,8 @@ static sa_result xrun_recovery(snd_pcm_t *handle, int err) {
             err = snd_pcm_prepare(handle);
             if(err < 0)
             {
-                SA_LOG(ERROR, "ALSA: Can't recover from suspend, prepare failed:", snd_strerror(err));
+                SA_LOG(SA_LOG_LEVEL_ERROR,
+                       "ALSA: Can't recover from suspend, prepare failed:", snd_strerror(err));
                 return SA_ERROR;
             }
         }
@@ -1243,7 +1257,7 @@ static sa_result xrun_recovery(snd_pcm_t *handle, int err) {
 static sa_result pause_alsa_device(sa_device *device) {
     if(message_pipe(device, 'p') == SA_ERROR)
     {
-        SA_LOG(ERROR, "Could not send pause command to the message pipe");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Could not send pause command to the message pipe");
         return SA_ERROR;
     };
     sa_set_device_state(device, SA_DEVICE_PAUSED);
@@ -1253,7 +1267,7 @@ static sa_result pause_alsa_device(sa_device *device) {
 static sa_result unpause_alsa_device(sa_device *device) {
     if(message_pipe(device, 'u') == SA_ERROR)
     {
-        SA_LOG(ERROR, "Could not send unpause command to the message pipe");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Could not send unpause command to the message pipe");
         return SA_ERROR;
     };
     sa_set_device_state(device, SA_DEVICE_STARTED);
@@ -1269,7 +1283,7 @@ static sa_result wait_for_start_alsa_device(sa_device *device) {
 static sa_result stop_alsa_device(sa_device *device) {
     if(message_pipe(device, 's') == SA_ERROR)
     {
-        SA_LOG(ERROR, "Could not send cancel command to the message pipe");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Could not send cancel command to the message pipe");
         return SA_ERROR;
     };
     sa_set_device_state(device, SA_DEVICE_STOPPED);
@@ -1287,7 +1301,7 @@ static sa_result pause_PCM_handle(sa_device *device) {
     {
         if(snd_pcm_pause(device->handle, 1) != 0)
         {
-            SA_LOG(ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when pausing)");
+            SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when pausing)");
             return SA_ERROR;
         }
         return SA_SUCCESS;
@@ -1304,7 +1318,7 @@ static sa_result unpause_PCM_handle(sa_device *device) {
     {
         if(snd_pcm_pause(device->handle, 0) != 0)
         {
-            SA_LOG(ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when resuming)");
+            SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: Failed to snd_pcm_pause the pcm handle (when resuming)");
             return SA_ERROR;
         }
     }
@@ -1312,7 +1326,7 @@ static sa_result unpause_PCM_handle(sa_device *device) {
 }
 
 static sa_result drop_alsa_device(sa_device *device) {
-    SA_LOG(DEBUG, "ALSA drop called");
+    SA_LOG(SA_LOG_LEVEL_DEBUG, "ALSA drop called");
     int err = 0;
     if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
                           snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED))
@@ -1322,14 +1336,15 @@ static sa_result drop_alsa_device(sa_device *device) {
         {
             return SA_SUCCESS;
         } else
-        { SA_LOG(ERROR, "ALSA: snd_pcm_drop() failed: ", snd_strerror(err)); }
+        { SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: snd_pcm_drop() failed: ", snd_strerror(err)); }
     }
-    SA_LOG(ERROR, "Failed to drop samples from the ALSA device: pcm_hanlde not in runnning or paused state");
+    SA_LOG(SA_LOG_LEVEL_ERROR,
+           "Failed to drop samples from the ALSA device: pcm_hanlde not in runnning or paused state");
     exit(EXIT_FAILURE);
 }
 
 static sa_result drain_alsa_device(sa_device *device) {
-    SA_LOG(DEBUG, "ALSA drain called");
+    SA_LOG(SA_LOG_LEVEL_DEBUG, "ALSA drain called");
     int err = 0;
     if(device->handle && (snd_pcm_state(device->handle) == SND_PCM_STATE_RUNNING ||
                           snd_pcm_state(device->handle) == SND_PCM_STATE_PAUSED))
@@ -1339,17 +1354,18 @@ static sa_result drain_alsa_device(sa_device *device) {
         {
             return SA_SUCCESS;
         } else
-        { SA_LOG(ERROR, "ALSA: snd_pcm_drain() failed: ", snd_strerror(err)); }
+        { SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: snd_pcm_drain() failed: ", snd_strerror(err)); }
     }
-    SA_LOG(ERROR, "Failed to drain samples from the ALSA device: pcm_handle not in runnning or paused state");
+    SA_LOG(SA_LOG_LEVEL_ERROR,
+           "Failed to drain samples from the ALSA device: pcm_handle not in runnning or paused state");
     exit(EXIT_FAILURE);
 }
 
 static sa_result prepare_alsa_device(sa_device *device) {
-    SA_LOG(DEBUG, "ALSA prepare called");
+    SA_LOG(SA_LOG_LEVEL_DEBUG, "ALSA prepare called");
     if(device->handle && snd_pcm_prepare(device->handle) == 0)
     { return SA_SUCCESS; }
-    SA_LOG(ERROR, "Failed to prepare the ALSA device");
+    SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to prepare the ALSA device");
     exit(EXIT_FAILURE);
 }
 
@@ -1357,7 +1373,7 @@ static sa_result message_pipe(sa_device *device, char toSend) {
     int result = write(device->pipe_write_end, &toSend, 1);
     if(result != 1)
     {
-        SA_LOG(ERROR, "Failed to write to the pipe");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to write to the pipe");
         exit(EXIT_FAILURE);
     }
     return SA_SUCCESS;
@@ -1376,15 +1392,15 @@ static sa_result cleanup_device(sa_device *device) {
             pthread_cond_destroy(&(device->condition_var->cond));
             free(device->condition_var);
         }
-
         if(device->samples)
         { free(device->samples); }
         if(device->handle)
         {
             int err = snd_pcm_close(device->handle);
             if(err < 0)
-            { SA_LOG(ERROR, "Could not close handle : ", snd_strerror(err)); }
+            { SA_LOG(SA_LOG_LEVEL_ERROR, "Could not close handle : ", snd_strerror(err)); }
         }
+        pthread_mutex_destroy(&(device->stateMutex));
         free(device);
         snd_config_update_free_global();
     }
@@ -1396,7 +1412,7 @@ static sa_result destroy_alsa_device(sa_device *device) {
     message_pipe(device, 'd');
     if(close_playback_thread(device) == SA_ERROR)
     {
-        SA_LOG(ERROR, "Could not close thread");
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Could not close thread");
         exit(EXIT_FAILURE);
     }
     return cleanup_device(device);
