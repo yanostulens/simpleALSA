@@ -1358,7 +1358,6 @@ static sa_result drain_alsa_device(sa_device *device) {
     }
     SA_LOG(SA_LOG_LEVEL_ERROR,
            "Failed to drain samples from the ALSA device: pcm_handle not in runnning or paused state");
-    exit(EXIT_FAILURE);
 }
 
 static sa_result prepare_alsa_device(sa_device *device) {
