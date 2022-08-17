@@ -2,6 +2,7 @@
 #define SIMPLEALSA_H
 /*============================== INCLUDES ==============================*/
 #include <alsa/asoundlib.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdbool.h>
 
@@ -664,7 +665,7 @@ extern sa_device_state sa_get_device_state(sa_device *device) {
 }
 
 extern sa_result sa_set_volume(sa_device *device, int volume) {
-    long min, max;
+    long min, max, volumeToSet;
     snd_mixer_t *handle;
     snd_mixer_selem_id_t *sid;
     const char *card       = device->config->device;
@@ -703,7 +704,12 @@ extern sa_result sa_set_volume(sa_device *device, int volume) {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to get the playback volume range");
         return SA_ERROR;
     }
-    if(snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100) != 0)
+    if(volume == 0)
+    {
+        volumeToSet = 0;
+    } else
+    { volumeToSet = volume * max / 100; }
+    if(snd_mixer_selem_set_playback_volume_all(elem, volumeToSet) != 0)
     {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to set playback volume");
         return SA_ERROR;
@@ -766,7 +772,11 @@ extern int sa_get_volume(sa_device *device) {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to close snd_mixer");
         return SA_ERROR;
     }
-    return (int) (mixer_volume * 100) / max;
+    float percentage = (float) mixer_volume / max;
+    if((percentage * 100) < 1)
+    { return 0; }
+    int result = round(percentage * 100);
+    return result;
 }
 
 /*========================= LOG DEFINITIONS ==========================*/
