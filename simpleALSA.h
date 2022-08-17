@@ -301,6 +301,14 @@ extern sa_result sa_destroy_device(sa_device *device);
  */
 extern sa_device_state sa_get_device_state(sa_device *device);
 
+/**
+ * @brief Sets the volume
+ * @param device - the device to set the volume on
+ * @param volume - value between [0;100]
+ * @return sa_result
+ */
+extern sa_result sa_set_volume(sa_device *device, int volume);
+
 /*=========================== LOG DECLARATIONS ===========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
@@ -565,7 +573,11 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     device_temp->config = config;
     device_temp->state  = SA_DEVICE_STOPPED;
     *device             = device_temp;
-    return init_alsa_device(*device);
+    if(init_alsa_device(*device) != SA_SUCCESS)
+    { return SA_ERROR; }
+    if(sa_set_volume(*device, 100) != SA_SUCCESS)
+    { return SA_ERROR; }
+    return SA_SUCCESS;
 }
 
     #ifdef SA_ASYNC_API
@@ -641,6 +653,60 @@ extern sa_device_state sa_get_device_state(sa_device *device) {
     pthread_mutex_unlock(&(device->stateMutex));
     return result;
 }
+
+extern sa_result sa_set_volume(sa_device *device, int volume) {
+    long min, max;
+    snd_mixer_t *handle;
+    snd_mixer_selem_id_t *sid;
+    const char *card       = device->config->device;
+    const char *selem_name = "Master";
+    if(snd_mixer_open(&handle, 0) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to open snd_mixer");
+        return SA_ERROR;
+    }
+    if(snd_mixer_attach(handle, card) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to attach a card to the mixer");
+        return SA_ERROR;
+    }
+    if(snd_mixer_selem_register(handle, NULL, NULL) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to register selem");
+        return SA_ERROR;
+    }
+    if(snd_mixer_load(handle) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to load snd_mixer");
+        return SA_ERROR;
+    }
+    snd_mixer_selem_id_alloca(&sid);
+    snd_mixer_selem_id_set_index(sid, 0);
+    snd_mixer_selem_id_set_name(sid, selem_name);
+    snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
+    if(elem == NULL)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to find selem");
+        return SA_ERROR;
+    }
+    if(snd_mixer_selem_get_playback_volume_range(elem, &min, &max) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to get the playback volume range");
+        return SA_ERROR;
+    }
+    if(snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to set playback volume");
+        return SA_ERROR;
+    }
+    if(snd_mixer_close(handle) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to close snd_mixer");
+        return SA_ERROR;
+    }
+    return SA_SUCCESS;
+}
+
 /*========================= LOG DEFINITIONS ==========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     switch(type)
@@ -1358,6 +1424,7 @@ static sa_result drain_alsa_device(sa_device *device) {
     }
     SA_LOG(SA_LOG_LEVEL_ERROR,
            "Failed to drain samples from the ALSA device: pcm_handle not in runnning or paused state");
+    return SA_ERROR;
 }
 
 static sa_result prepare_alsa_device(sa_device *device) {
