@@ -85,7 +85,8 @@ int main(int argc, char const *argv[]) {
                 sa_stop_device(device);
                 printf("State = %i\n", device->state);
                 sf_seek(infile, 0, SEEK_SET);
-            }
+            } else if(strcmp(input, "vol\n") == 0)
+            { sa_set_volume(device, 50); }
         }
     }
     sf_close(infile);
