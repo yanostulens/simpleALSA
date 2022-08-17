@@ -309,6 +309,15 @@ extern sa_device_state sa_get_device_state(sa_device *device);
  */
 extern sa_result sa_set_volume(sa_device *device, int volume);
 
+/**
+ * @brief Returns the current volume that is set at mixer level
+ * Returns the volume as a value between [0;100]
+ * Returns -1 (SA_ERROR) on failure
+ * @param device
+ * @return int
+ */
+extern int sa_get_volume(sa_device *device);
+
 /*=========================== LOG DECLARATIONS ===========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
@@ -705,6 +714,59 @@ extern sa_result sa_set_volume(sa_device *device, int volume) {
         return SA_ERROR;
     }
     return SA_SUCCESS;
+}
+
+extern int sa_get_volume(sa_device *device) {
+    long mixer_volume, min, max;
+    snd_mixer_t *handle;
+    snd_mixer_selem_id_t *sid;
+    const char *card       = device->config->device;
+    const char *selem_name = "Master";
+    if(snd_mixer_open(&handle, 0) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to open snd_mixer");
+        return SA_ERROR;
+    }
+    if(snd_mixer_attach(handle, card) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to attach a card to the mixer");
+        return SA_ERROR;
+    }
+    if(snd_mixer_selem_register(handle, NULL, NULL) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to register selem");
+        return SA_ERROR;
+    }
+    if(snd_mixer_load(handle) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to load snd_mixer");
+        return SA_ERROR;
+    }
+    snd_mixer_selem_id_alloca(&sid);
+    snd_mixer_selem_id_set_index(sid, 0);
+    snd_mixer_selem_id_set_name(sid, selem_name);
+    snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
+    if(elem == NULL)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to find selem");
+        return SA_ERROR;
+    }
+    if(snd_mixer_selem_get_playback_volume_range(elem, &min, &max) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to get the playback volume range");
+        return SA_ERROR;
+    }
+    if(snd_mixer_selem_get_playback_volume(elem, SND_MIXER_SCHN_MONO, &mixer_volume) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to get the playback volume");
+        return SA_ERROR;
+    }
+    if(snd_mixer_close(handle) != 0)
+    {
+        SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to close snd_mixer");
+        return SA_ERROR;
+    }
+    return (int) (mixer_volume * 100) / max;
 }
 
 /*========================= LOG DEFINITIONS ==========================*/
