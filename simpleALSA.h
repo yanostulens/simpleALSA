@@ -789,11 +789,11 @@ static sa_result init_alsa_device(sa_device *device) {
     snd_pcm_hw_params_alloca(&(device->hw_params));
     snd_pcm_sw_params_alloca(&(device->sw_params));
 
-    if((err = snd_mixer_open(&(device->mixer_handle), 0)) < 0)
-    {
-        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not open mixer handle:", snd_strerror(err));
-        exit(EXIT_FAILURE);
-    }
+    // if((err = snd_mixer_open(&(device->mixer_handle), 0)) < 0)
+    // {
+    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not open mixer handle:", snd_strerror(err));
+    //     exit(EXIT_FAILURE);
+    // }
     if((err = snd_pcm_open(&(device->handle), device->config->alsa_device_name, SND_PCM_STREAM_PLAYBACK, 0)) <
        0)
     {
@@ -811,31 +811,31 @@ static sa_result init_alsa_device(sa_device *device) {
         SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: setting software parameters failed:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
-    if((err = snd_mixer_attach(device->mixer_handle, device->config->alsa_device_name)) != 0)
-    {
-        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not attach mixer:", snd_strerror(err));
-        exit(EXIT_FAILURE);
-    }
-    if((err = snd_mixer_selem_register(device->mixer_handle, NULL, NULL)) != 0)
-    {
-        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not register selem:", snd_strerror(err));
-        exit(EXIT_FAILURE);
-    }
-    if((err = snd_mixer_load(device->mixer_handle)) != 0)
-    {
-        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not load mixer:", snd_strerror(err));
-        exit(EXIT_FAILURE);
-    }
-    snd_mixer_selem_id_t *selem_handle;
-    snd_mixer_selem_id_alloca(&selem_handle);
-    snd_mixer_selem_id_set_index(selem_handle, 0);
-    snd_mixer_selem_id_set_name(selem_handle, "Master");
-    device->volume_handle = snd_mixer_find_selem(device->mixer_handle, selem_handle);
-    if(device->volume_handle == NULL)
-    {
-        SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not find mixer selem");
-        exit(EXIT_FAILURE);
-    }
+    // if((err = snd_mixer_attach(device->mixer_handle, device->config->alsa_device_name)) != 0)
+    // {
+    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not attach mixer:", snd_strerror(err));
+    //     exit(EXIT_FAILURE);
+    // }
+    // if((err = snd_mixer_selem_register(device->mixer_handle, NULL, NULL)) != 0)
+    // {
+    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not register selem:", snd_strerror(err));
+    //     exit(EXIT_FAILURE);
+    // }
+    // if((err = snd_mixer_load(device->mixer_handle)) != 0)
+    // {
+    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not load mixer:", snd_strerror(err));
+    //     exit(EXIT_FAILURE);
+    // }
+    // snd_mixer_selem_id_t *selem_handle;
+    // snd_mixer_selem_id_alloca(&selem_handle);
+    // snd_mixer_selem_id_set_index(selem_handle, 0);
+    // snd_mixer_selem_id_set_name(selem_handle, "Master");
+    // device->volume_handle = snd_mixer_find_selem(device->mixer_handle, selem_handle);
+    // if(device->volume_handle == NULL)
+    // {
+    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not find mixer selem");
+    //     exit(EXIT_FAILURE);
+    // }
 
     device->samples = (int *) malloc((device->period_size * device->config->channels *
                                       snd_pcm_format_physical_width(device->config->format)) /
