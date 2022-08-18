@@ -87,15 +87,15 @@ int main(int argc, char const *argv[]) {
                 sf_seek(infile, 0, SEEK_SET);
             } else if(strcmp(input, "90\n") == 0)
             {
-                sa_set_volume(device, 90);
+                sa_set_volume_dB(device, -100);
             } else if(strcmp(input, "20\n") == 0)
             {
-                sa_set_volume(device, 20);
+                sa_set_volume_dB(device, -10);
             } else if(strcmp(input, "0\n") == 0)
             {
-                sa_set_volume(device, 0);
+                sa_set_volume_dB(device, -0.01);
             } else if(strcmp(input, "getVol\n") == 0)
-            { printf("Current volume %i \n", sa_get_volume(device)); }
+            { printf("Current volume %f \n", sa_get_volume_dB(device)); }
         }
     }
     sf_close(infile);
