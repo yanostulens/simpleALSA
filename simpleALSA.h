@@ -317,25 +317,25 @@ extern sa_result sa_destroy_device(sa_device *device);
  */
 extern sa_device_state sa_get_device_state(sa_device *device);
 
-/**
- * @brief Sets the volume in dB
- * @param device - the device to set the volume on
- * @param volume - dB value between [-100;0]
- * @return sa_result
- */
-extern sa_result sa_set_volume_dB(sa_device *device, float volume);
+// /**
+//  * @brief Sets the volume in dB
+//  * @param device - the device to set the volume on
+//  * @param volume - dB value between [-100;0]
+//  * @return sa_result
+//  */
+// extern sa_result sa_set_volume_dB(sa_device *device, float volume);
 
-/**
- * @brief Returns the current volume
- * Returns the volume as a value between [-100;0] dB
- * Returns -1 (SA_ERROR) on failure
- * @note This function will just return the last successful volume settting that has been
- * set by sa_set_volume_dB() as I did not find a bug free way to retrieve the current volume setting
- * with the snd_mixer API
- * @param device
- * @return float
- */
-extern float sa_get_volume_dB(sa_device *device);
+// /**
+//  * @brief Returns the current volume
+//  * Returns the volume as a value between [-100;0] dB
+//  * Returns -1 (SA_ERROR) on failure
+//  * @note This function will just return the last successful volume settting that has been
+//  * set by sa_set_volume_dB() as I did not find a bug free way to retrieve the current volume setting
+//  * with the snd_mixer API
+//  * @param device
+//  * @return float
+//  */
+// extern float sa_get_volume_dB(sa_device *device);
 
 /*=========================== LOG DECLARATIONS ===========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
@@ -576,10 +576,10 @@ static sa_result destroy_alsa_device(sa_device *device);
  */
 static void sa_set_device_state(sa_device *device, sa_device_state state);
 
-/**
- * @brief Convert a dB value to a percentage value between [0;100]
- */
-static float convert_dB_to_percentage(float dB);
+// /**
+//  * @brief Convert a dB value to a percentage value between [0;100]
+//  */
+// static float convert_dB_to_percentage(float dB);
 
 /*========================= API DEFINITIONS ==========================*/
 extern sa_result sa_init_device_config(sa_device_config **config) {
@@ -608,8 +608,6 @@ extern sa_result sa_init_device(sa_device_config *config, sa_device **device) {
     device_temp->state  = SA_DEVICE_STOPPED;
     *device             = device_temp;
     if(init_alsa_device(*device) != SA_SUCCESS)
-    { return SA_ERROR; }
-    if(sa_set_volume_dB(*device, 0) != SA_SUCCESS)
     { return SA_ERROR; }
     return SA_SUCCESS;
 }
@@ -1574,18 +1572,18 @@ static void sa_set_device_state(sa_device *device, sa_device_state state) {
     pthread_mutex_unlock(&(device->stateMutex));
 }
 
-static float convert_dB_to_percentage(float dB) {
-    float result;
-    if(dB <= -100)
-    {
-        result = 0;
-    } else if(dB > 0)
-    {
-        result = 100;
-    } else
-    { result = pow(10.0, (float) (dB / 20)) * 100; }
-    return result;
-}
+    // static float convert_dB_to_percentage(float dB) {
+    //     float result;
+    //     if(dB <= -100)
+    //     {
+    //         result = 0;
+    //     } else if(dB > 0)
+    //     {
+    //         result = 100;
+    //     } else
+    //     { result = pow(10.0, (float) (dB / 20)) * 100; }
+    //     return result;
+    // }
 
 #endif  // SA_IMPLEMENTATION
 #endif  // SIMPLEALSA_H
