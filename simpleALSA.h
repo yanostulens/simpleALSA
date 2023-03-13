@@ -1055,13 +1055,13 @@ static sa_result set_software_parameters(sa_device *device) {
 static sa_result prepare_playback_thread(sa_device *device) {
     /** Prepare communication pipe */
     int pipe_fds[2];
-    if(pipe(pipe_fds))
+    if(pipe(pipe_fds)<0)
     {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Cannot create poll_pipe");
         return SA_ERROR;
     }
     /** Makes read end nonblocking */
-    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK))
+    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK)<0)
     {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to make pipe non-blocking");
         close(pipe_fds[0]);
