@@ -367,26 +367,6 @@ extern sa_result sa_destroy_device(sa_device *device);
  */
 extern sa_device_state sa_get_device_state(sa_device *device);
 
-// /**
-//  * @brief Sets the volume in dB
-//  * @param device - the device to set the volume on
-//  * @param volume - dB value between [-100;0]
-//  * @return sa_result
-//  */
-// extern sa_result sa_set_volume_dB(sa_device *device, float volume);
-
-// /**
-//  * @brief Returns the current volume
-//  * Returns the volume as a value between [-100;0] dB
-//  * Returns -1 (SA_ERROR) on failure
-//  * @note This function will just return the last successful volume settting that has been
-//  * set by sa_set_volume_dB() as I did not find a bug free way to retrieve the current volume setting
-//  * with the snd_mixer API
-//  * @param device
-//  * @return float
-//  */
-// extern float sa_get_volume_dB(sa_device *device);
-
 /*=========================== LOG DECLARATIONS ===========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]);
 
@@ -626,11 +606,6 @@ static sa_result destroy_alsa_device(sa_device *device);
  */
 static void sa_set_device_state(sa_device *device, sa_device_state state);
 
-// /**
-//  * @brief Convert a dB value to a percentage value between [0;100]
-//  */
-// static float convert_dB_to_percentage(float dB);
-
 /*========================= API DEFINITIONS ==========================*/
 extern sa_result sa_init_device_config(sa_device_config **config) {
     sa_device_config *config_temp = (sa_device_config *) malloc(sizeof(sa_device_config));
@@ -736,78 +711,6 @@ extern sa_device_state sa_get_device_state(sa_device *device) {
     return result;
 }
 
-// extern sa_result sa_set_volume_dB(sa_device *device, float volume_dB) {
-//     // long min, max, volumeToSet;
-//     // float volume_percentage;
-//     // snd_mixer_t *handle;
-//     // snd_mixer_selem_id_t *sid;
-//     // const char *card       = device->config->alsa_device_name;
-//     // const char *selem_name = "Master";
-//     // if(volume_dB < -100 || volume_dB > 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Invalid volume value");
-//     //     return SA_ERROR;
-//     // }
-//     // volume_percentage = convert_dB_to_percentage(volume_dB);
-//     // if(snd_mixer_open(&handle, 0) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to open snd_mixer");
-//     //     return SA_ERROR;
-//     // }
-//     // if(snd_mixer_attach(handle, card) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to attach a card to the mixer");
-//     //     return SA_ERROR;
-//     // }
-//     // if(snd_mixer_selem_register(handle, NULL, NULL) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to register selem");
-//     //     return SA_ERROR;
-//     // }
-//     // if(snd_mixer_load(handle) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to load snd_mixer");
-//     //     return SA_ERROR;
-//     // }
-//     // snd_mixer_selem_id_alloca(&sid);
-//     // snd_mixer_selem_id_set_index(sid, 0);
-//     // snd_mixer_selem_id_set_name(sid, selem_name);
-//     // snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
-//     // if(elem == NULL)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to find selem");
-//     //     return SA_ERROR;
-//     // }
-//     // if(snd_mixer_selem_get_playback_volume_range(elem, &min, &max) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to get the playback volume range");
-//     //     return SA_ERROR;
-//     // }
-//     // if(volume_percentage == 0)
-//     // {
-//     //     volumeToSet = 0;
-//     // } else
-//     // { volumeToSet = volume_percentage * max / 100; }
-//     // if(snd_mixer_selem_set_playback_volume_all(elem, volumeToSet) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to set playback volume");
-//     //     return SA_ERROR;
-//     // }
-//     // if(snd_mixer_close(handle) != 0)
-//     // {
-//     //     SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to close snd_mixer");
-//     //     return SA_ERROR;
-//     // }
-//     // device->volume_dB         = volume_dB;
-//     // device->volume_percentage = volume_percentage;
-//     return SA_SUCCESS;
-// }
-
-// extern float sa_get_volume_dB(sa_device *device) {
-//     // return device->volume_dB;
-//     return 0.0;
-// }
-
 /*========================= LOG DEFINITIONS ==========================*/
 static void sa_log(sa_log_type type, const char msg0[], const char msg1[]) {
     switch(type)
@@ -839,11 +742,6 @@ static sa_result init_alsa_device(sa_device *device) {
     snd_pcm_hw_params_alloca(&(device->hw_params));
     snd_pcm_sw_params_alloca(&(device->sw_params));
 
-    // if((err = snd_mixer_open(&(device->mixer_handle), 0)) < 0)
-    // {
-    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not open mixer handle:", snd_strerror(err));
-    //     exit(EXIT_FAILURE);
-    // }
     if((err = snd_pcm_open(&(device->handle), device->config->alsa_device_name, SND_PCM_STREAM_PLAYBACK, 0)) <
        0)
     {
@@ -861,31 +759,6 @@ static sa_result init_alsa_device(sa_device *device) {
         SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: setting software parameters failed:", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
-    // if((err = snd_mixer_attach(device->mixer_handle, device->config->alsa_device_name)) != 0)
-    // {
-    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not attach mixer:", snd_strerror(err));
-    //     exit(EXIT_FAILURE);
-    // }
-    // if((err = snd_mixer_selem_register(device->mixer_handle, NULL, NULL)) != 0)
-    // {
-    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not register selem:", snd_strerror(err));
-    //     exit(EXIT_FAILURE);
-    // }
-    // if((err = snd_mixer_load(device->mixer_handle)) != 0)
-    // {
-    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not load mixer:", snd_strerror(err));
-    //     exit(EXIT_FAILURE);
-    // }
-    // snd_mixer_selem_id_t *selem_handle;
-    // snd_mixer_selem_id_alloca(&selem_handle);
-    // snd_mixer_selem_id_set_index(selem_handle, 0);
-    // snd_mixer_selem_id_set_name(selem_handle, "Master");
-    // device->volume_handle = snd_mixer_find_selem(device->mixer_handle, selem_handle);
-    // if(device->volume_handle == NULL)
-    // {
-    //     SA_LOG(SA_LOG_LEVEL_ERROR, "ALSA: could not find mixer selem");
-    //     exit(EXIT_FAILURE);
-    // }
 
     device->samples = (int *) malloc((device->period_size * device->config->channels *
                                       snd_pcm_format_physical_width(device->config->format)) /
@@ -1055,13 +928,13 @@ static sa_result set_software_parameters(sa_device *device) {
 static sa_result prepare_playback_thread(sa_device *device) {
     /** Prepare communication pipe */
     int pipe_fds[2];
-    if(pipe(pipe_fds)<0)
+    if(pipe(pipe_fds) < 0)
     {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Cannot create poll_pipe");
         return SA_ERROR;
     }
     /** Makes read end nonblocking */
-    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK)<0)
+    if(fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) < 0)
     {
         SA_LOG(SA_LOG_LEVEL_ERROR, "Failed to make pipe non-blocking");
         close(pipe_fds[0]);
@@ -1621,19 +1494,6 @@ static void sa_set_device_state(sa_device *device, sa_device_state state) {
     device->state = state;
     pthread_mutex_unlock(&(device->stateMutex));
 }
-
-    // static float convert_dB_to_percentage(float dB) {
-    //     float result;
-    //     if(dB <= -100)
-    //     {
-    //         result = 0;
-    //     } else if(dB > 0)
-    //     {
-    //         result = 100;
-    //     } else
-    //     { result = pow(10.0, (float) (dB / 20)) * 100; }
-    //     return result;
-    // }
 
 #endif  // SA_IMPLEMENTATION
 #endif  // SIMPLEALSA_H
